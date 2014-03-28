@@ -1,5 +1,5 @@
-flow
-====
+flow.js
+=======
 
 Manage async callbacks
 
@@ -19,23 +19,26 @@ flow(function (counter) {
     console.log(err);
     console.log(results);
     console.log('Task 2 completed.');
-    counter.next();
-}
+});
 ```
 
-##### How it works:
+##### How the example works:
 
 Step 1:
-You are given a counter object that should be used to set the number of async resources/callbacks that you need to manage.
-In the above example it is two.
+You are given a counter object that should be used to set the number of async resources/callbacks that need to be managed.
+(which is two, in the given example).
 
 Step 2:
-Use the same counter object to decrement the counter within the callback using the tick() method.
-Also pass the results/errors of the callbacks so that the next task in the queue gets them as their input.
-Once counter hits zero, it executes step 3 (i.e "Task 2").
+Use the same counter instance to decrement the counter within the callback using the tick() method.
+Also pass the results/errors through tick() so that the next task in the list gets them as it's input.
+Once counter hits zero, it executes the next task in the list (which is "Task 2" in the example above).
 
 Step 3:
-In "Task 2" (in the above example), the results and errors which (we got from step 2) are displayed.
+In "Task 2" function, the results and errors which we got from previous task are displayed.
+
+##### Documentation
+
+[API Documentation](munawwar.github.io/flow/doc/)
 
 ##### More complex example (with repeating tasks and inc() call).
 
@@ -53,7 +56,7 @@ flow(function (counter) {
     console.log(errs);
     console.log(results);
     console.log('Task 2 completed.');
-    counter.next();
+    counter.next(); //needed to execute next task
 }, function (counter, errs, results, repeatCount) {
     if (repeatCount < 2) {
         counter.setFlow({repeat: true}); //which means when tick() reaches zero, it will repeat this task again.
@@ -70,6 +73,5 @@ flow(function (counter) {
     console.log(errs);
     console.log(results);
     console.log('Task 4 completed.');
-    console.log('Done');
 });
 ```

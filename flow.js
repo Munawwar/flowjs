@@ -1,38 +1,39 @@
-/**
+/*
  * flow.js v0.1.0. MIT License.
- * Manage asyncronous operations and your application's flow of control.
- *
- * Basic idea is to make the developer effectively use counters.
- *
-        flow(function (c) {
-            for (var i = 0; i < 3; i += 1) {
-                c.inc();
-                ...
-                ...
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState === 4) {
-                        if (xhr.status === 200) {
-                            c.dec(null, JSON.parse(xhr.resposeText));
-                        } else {
-                            c.dec({errorCode: xhr.status});
-                        }
-                    }
-                }
-            }
-        }, function (c, err, results) {
-            //do something
-        }, this); //context in which the funtions will run
-
-        //Another way to use
-        var tasks = flow.tasks(...);
-        tasks.execute();
+ * Manage async callbacks.
  */
 
 (function (global) {
     /**
      * Manage asyncronous operations.
+
+    flow(function (c) {
+        for (var i = 0; i < 3; i += 1) {
+            c.inc();
+            ...
+            ...
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        c.dec(null, JSON.parse(xhr.resposeText));
+                    } else {
+                        c.dec({errorCode: xhr.status});
+                    }
+                }
+            }
+        }
+    }, function (c, err, results) {
+        //do something
+    }, this); //context in which the funtions will run
+
+    //Another way to use
+    var tasks = flow.tasks(...);
+    tasks.execute();
+
+     * @class flow
+     * @singleton
      * @param {Object} [config]
-     * @param {...} functions func1, func2, ... funcN
+     * @param {Function} functions func1, func2, ... funcN
      * @param {Object} [scope]
      */
     function flow() {
@@ -40,7 +41,10 @@
     }
 
     /**
-     * Same arguments as flow().
+     * Same arguments as flow(). The only difference is that the task isn't execute immediately.
+     * Use execute() method to start executing the list.
+     * @method tasks
+     * @returns {Manager}
      */
     flow.tasks = function () {
         var callbacks = Array.prototype.slice.call(arguments),
