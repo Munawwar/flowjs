@@ -35,55 +35,145 @@
     }
     flow.tasks = function () {
         var callbacks = Array.prototype.slice.call(arguments),
-            scope;
-        if (typeof callbacks[callbacks.length - 1] === 'object') {
-            scope = callbacks.pop();
+            options = {};
+        if (typeof callbacks[0] === 'object') {
+            options = callbacks.shift();
         }
-        return new Manager(callbacks, scope);
+        if (typeof callbacks[callbacks.length - 1] === 'object') {
+            options.scope = callbacks.pop();
+        }
+        return new Manager(callbacks, options);
     };
 
     //Manager class
-    function Manager(callbacks, scope) {
+    //private
+    function Manager(callbacks, options) {
         this.callbacks = callbacks;
-        this.scope = scope;
         this.lastArgs = [];
         this.errors = [];
         this.results = [];
 
         this.currentFunc = -1;
-        this.count = this.repeatCount = 0;
-        this.repeatNext = false;
+
+        this.set(options);
     }
     Manager.prototype = {
         callbacks: null,
 
-        count: 0,
         currentFunc: -1,
         repeatNext: false,
         repeatCount: 0,
 
-        errors: null,
         results: null,
+        errors: null,
+        /**
+         * Error tolerance level.
+         */
+        tolerance: 0, //call the next() method on an error.
         scope: null,
         lastArgs: null, //keeps track of arguments passed to last callback. This is needed in case of repeating a callback.
 
         /**
-         * Set counter value. And say what to do when counter hits zero.
-         * @param {Number} val Value of the counter to be set.
-         * @param {Boolean} [repeat=false] If true, repeats the current task when counter hits zero
+         * Decide the flow and behavior of task execution.
+         * Tell what to do when counter hits zero or an error condition.
+         * @param {Object} config
+         * @param {Boolean} [config.repeat=false] If true, repeats the current task once, when counter hits zero.
+         * @param {Boolean} [config.tolerance=0]
          */
-        set: function (val, repeat) {
+        set: function (options) {
+            if (options.tolerance !== undefined) {
+                this.tolerance = !!options.tolerance;
+            }
+            if (typeof options.repeat === 'boolean') {
+                this.repeatNext = options.repeat;
+            }
+        },
+        /**
+         * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
+         */
+        store: function (error, result) {
+            this.errors.push(error);
+            this.results.push(result);
+        },
+        /**
+         * Execute the next task.
+         */
+        next: function (error, result) {
+            if (error !== undefined || result !== undefined) {
+                this.errors.push(error);
+                this.results.push(result);
+            }
+
+            //TODO: Think about whether to send array when all values are null or not..
+            var errs = compact(this.errors), res;
+            //don't repeat if !this.tolerance && error.
+            if (this.repeatNext && (this.tolerance || (!this.tolerance && !errs))) {
+                errs = this.lastArgs[0];
+                res = this.lastArgs[1];
+
+                this.repeatCount += 1;
+            } else {
+                this.currentFunc += 1;
+                res = this.results;
+
+                //reset in preparation for the next call in queue
+                this.errors = [];
+                this.results = [];
+                this.repeatCount = 0;
+            }
+            this.repeatNext = false;
+
+            if (this.callbacks[this.currentFunc]) {
+                this.lastArgs = [errs, res];
+                if (!this.tolerance && errs && errs[0]) {
+                    errs = errs[0];
+                }
+                var counter = new Counter({manager: this, tolerance: this.tolerance});
+                this.callbacks[this.currentFunc].call(this.scope, counter, errs, res, this.repeatCount);
+            }
+        }
+    };
+    Manager.prototype.execute = Manager.prototype.next;
+
+    /**
+     * A counter, that callbacks have access to.
+     * This has been moved from Manager, so that decrement operation on a stale counter doesn't affect the
+     * flow of control unknowingly. i.e just for robustness.
+     */
+    function Counter(config) {
+        this.manager = config.manager;
+        this.tolerance = config.tolerance;
+        this.count = 0;
+    }
+
+    Counter.prototype = {
+        /**
+         * Set counter value. Also set the flow and behavior of task execution.
+         * @param {Number} val Value of the counter to be set.
+         * @param {Boolean} [repeat=false] Check setFlow() method for documentation.
+         * @param {Boolean} [tolerance] Check setFlow() method for documentation.
+         */
+        set: function (val, repeat, tolerance) {
             if (typeof val === 'number' && val > 0) {
                 this.count = val;
             }
-            this.repeatNext = !!repeat;
+            this.setFlow({repeat: repeat, tolerance: tolerance});
         },
         /**
-         * Say what to do when counter hits zero.
-         * @param {Boolean} [repeat=false] If true, repeats the current task when counter hits zero
+         * Decide the flow and behavior of task execution.
+         * Tell what to do when counter hits zero or when faced with an error.
+         * @param {Object} [config]
+         * @param {Boolean} [config.repeat=false] If true, repeats the current task exactly once, when counter hits zero.
+         * @param {Boolean} [config.tolerance=manager.tolerance] Error tolerance level.
+         * If an error is encountered when tolerance = 0, then a call to tick(err, null) will immediately cause the next task to be executed
+         * and the error will be passed to that task.
+         * If tolerance = 1, then tick(err, null) will store the error(s) and pass them to the next task only when counter hits zero.
          */
-        setFlow:function (repeat) {
-            this.repeatNext = !!repeat;
+        setFlow: function (config) {
+            if (config.tolerance !== undefined) {
+                this.tolerance = !!config.tolerance;
+            }
+            this.manager.set(config);
         },
         /**
          * Increment counter.
@@ -99,55 +189,37 @@
          * Decrements counter by 1. Send the error or result.
          */
         tick: function (error, result) {
-            this.count -= 1;
-            this.errors.push(error);
-            this.results.push(result);
-
-            this.next();
+            //prevent invalid state...
+            if (this.count > 0) {
+                this.count -= 1;
+                this.manager.store(error, result);
+                if (!this.tolerance && error) {
+                    //set to zero so that future decrements, doesn't affect.
+                    this.count = 0;
+                }
+                this.next();
+            }
         },
         /**
          * Execute the next task.
          * Note: The next task won't be called if counter is greater than zero.
          */
         next: function (error, result) {
-            if (this.count === 0) {
-                if (error || result) {
-                    this.errors.push(error);
-                    this.results.push(result);
-                }
-
-                //TODO: Think about whether to send array when all values are null or not..
-                var errs, res;
-                if (this.repeatNext) {
-                    errs = this.lastArgs[0];
-                    res = this.lastArgs[1];
-
-                    this.repeatNext = false;
-                    this.repeatCount += 1;
-                } else {
-                    this.currentFunc += 1;
-                    errs = compact(this.errors);
-                    res = this.results;
-
-                    //reset in preparation for the next call in queue
-                    this.errors = [];
-                    this.results = [];
-                    this.repeatCount = 0;
-                }
-
-                if (this.callbacks[this.currentFunc]) {
-                    this.lastArgs = [errs, res];
-                    this.callbacks[this.currentFunc].call(this.scope, this, errs, res, this.repeatCount);
-                }
-            }
-            //prevent invalid state...
-            if (this.count < 0) {
+            if (!this.tolerance && error) {
+                //set to zero so that future decrements, doesn't affect.
                 this.count = 0;
+            }
+            if (this.count === 0) {
+                this.manager.next(error, result);
             }
         }
     };
-    Manager.prototype.execute = Manager.prototype.next;
+    Counter.prototype.execute = Counter.prototype.next;
 
+    /*
+     * If all items of array are empty, return null.
+     * Else return original unmodified array.
+     */
     function compact(arr) {
         var isEmpty = true;
         arr.some(function (a) {
