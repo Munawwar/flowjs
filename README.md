@@ -3,27 +3,51 @@ flow
 
 Manage async callbacks
 
+##### Simple example
+
+```javascript
+flow(function (counter) {
+    counter.set(2);
+    //Do some async operations
+    for (var i = 2; i > 0; i -= 1) {
+        setTimeout(function () {
+            counter.tick(null, this.index);
+        }.bind({index: i}), Math.random() * 100);
+    }
+    console.log('Task 1 completed.');
+}, function (counter, err, results) {
+    console.log(err);
+    console.log(results);
+    console.log('Task 2 completed.');
+    counter.next();
+}
 ```
+
+##### How it works:
+
+Step 1:
+You are given a counter object that should be used to set the number of async resources/callbacks that you need to manage.
+In the above example it is two.
+
+Step 2:
+Use the same counter object to decrement the counter within the callback using the tick() method.
+Also pass the results/errors of the callbacks so that the next task in the queue gets them as their input.
+Once counter hits zero, it executes step 3 (i.e "Task 2").
+
+Step 3:
+In "Task 2" (in the above example), the results and errors which (we got from step 2) are displayed.
+
+##### More complex example (with repeating tasks and inc() call).
+
+```javascript
 flow(function (counter) {
     //Do some async operations
-    [
-        'Hello.txt',
-        'World.txt',
-    ].forEach(function (url) {
-        counter.inc(); //increment counter by 1. counter was initally zero.
-
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4) {
-                console.log(url);
-                //decrement counter and send results/errors.
-                //When counter hits zero, the next task will be called.
-                counter.tick(null, xhr.responseText);
-            }
-        };
-        xhr.send();
-    });
+    for (var i = 2; i > 0; i -= 1) {
+        counter.inc(); //increments counter by 1
+        setTimeout(function () {
+            counter.tick(null, this.index);
+        }.bind({index: i}), Math.random() * 100);
+    }
     console.log('Task 1 completed.');
 }, function (counter, errs, results) {
     console.log(errs);
@@ -32,25 +56,15 @@ flow(function (counter) {
     counter.next();
 }, function (counter, errs, results, repeatCount) {
     if (repeatCount < 2) {
-        counter.setFlow(true); //which means when tick() reaches zero, it will repeat this task again.
+        counter.setFlow({repeat: true}); //which means when tick() reaches zero, it will repeat this task again.
     }
     //Do some async operations
-    [
-        'Hello.txt',
-        'World.txt',
-    ].forEach(function (url) {
-        counter.inc(); //increment
-
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4) {
-                console.log(url);
-                counter.tick(null, xhr.responseText); //decrement and send results/errors
-            }
-        };
-        xhr.send();
-    });
+    for (var i = 2; i > 0; i -= 1) {
+        counter.inc();
+        setTimeout(function () {
+            counter.tick(null, this.index);
+        }.bind({index: i}), Math.random() * 100);
+    }
     console.log('Task 3 completed.');
 }, function (counter, errs, results) {
     console.log(errs);

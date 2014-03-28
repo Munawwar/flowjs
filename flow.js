@@ -1,38 +1,47 @@
 /**
- * Flow v0.1.0
+ * flow.js v0.1.0. MIT License.
  * Manage asyncronous operations and your application's flow of control.
  *
  * Basic idea is to make the developer effectively use counters.
  *
- * @example
-    flow(function (c) {
-        for (var i = 0; i < 3; i += 1) {
-            c.inc();
-            ...
-            ...
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        c.dec(null, JSON.parse(xhr.resposeText));
-                    } else {
-                        c.dec({errorCode: xhr.status});
+        flow(function (c) {
+            for (var i = 0; i < 3; i += 1) {
+                c.inc();
+                ...
+                ...
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            c.dec(null, JSON.parse(xhr.resposeText));
+                        } else {
+                            c.dec({errorCode: xhr.status});
+                        }
                     }
                 }
             }
-        }
-    }, function (c, err, results) {
-        //do something
-    }, this); //context in which the funtions will run
+        }, function (c, err, results) {
+            //do something
+        }, this); //context in which the funtions will run
 
-    //Another way to use
-    var tasks = flow.tasks(...);
-    tasks.execute();
+        //Another way to use
+        var tasks = flow.tasks(...);
+        tasks.execute();
  */
 
 (function (global) {
+    /**
+     * Manage asyncronous operations.
+     * @param {Object} [config]
+     * @param {...} functions func1, func2, ... funcN
+     * @param {Object} [scope]
+     */
     function flow() {
         flow.tasks.apply(this, arguments).next();
     }
+
+    /**
+     * Same arguments as flow().
+     */
     flow.tasks = function () {
         var callbacks = Array.prototype.slice.call(arguments),
             options = {};
@@ -45,8 +54,10 @@
         return new Manager(callbacks, options);
     };
 
-    //Manager class
-    //private
+    /**
+     * Manager class
+     * @private
+     */
     function Manager(callbacks, options) {
         this.callbacks = callbacks;
         this.lastArgs = [];
