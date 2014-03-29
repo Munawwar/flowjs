@@ -25,13 +25,13 @@ flow(function (counter) {
 ##### How the example works:
 
 Step 1:
-You are given a counter object that should be used to set the number of async resources/callbacks that need to be managed.
+You are given a counter object that should be used to set the number of async resources/callbacks that needs to be managed.
 (which is two, in the given example).
 
 Step 2:
-Use the same counter instance to decrement the counter within the callback using the tick() method.
+Use the same counter instance to decrement the counter within the callbacks using the tick() method.
 Also pass the results/errors through tick() so that the next task in the list gets them as it's input.
-Once counter hits zero, it executes the next task in the list (which is "Task 2" in the example above).
+Once counter hits zero, flow.js executes the next task in the list (which is "Task 2" in the example above).
 
 Step 3:
 In "Task 2" function, the results and errors which we got from previous task are displayed.
