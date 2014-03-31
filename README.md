@@ -54,12 +54,12 @@ flow(function (counter) {
         }.bind({index: i}), Math.random() * 100);
     }
     console.log('Task 1 completed.');
-}, function (counter, errs, results) {
-    console.log(errs);
+}, function (counter, err, results) {
+    console.log(err);
     console.log(results);
     console.log('Task 2 completed.');
     counter.next(); //needed to execute next task
-}, function (counter, errs, results, repeatCount) {
+}, function (counter, err, results, repeatCount) {
     var repeat = (repeatCount < 2);
     counter.set(2, repeat); //if repeat = true, then this task will be repeated when counter hits zero.
     
@@ -70,8 +70,8 @@ flow(function (counter) {
         }.bind({index: i}), Math.random() * 100);
     }
     console.log('Task 3 completed.');
-}, function (counter, errs, results) {
-    console.log(errs);
+}, function (counter, err, results) {
+    console.log(err);
     console.log(results);
     console.log('Task 4 completed.');
 });
