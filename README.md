@@ -3,6 +3,8 @@ flow.js
 
 Manage async callbacks
 
+`flow(func1, func2, func3, ...[, scope]);` where each function gets `counter, err, results` as arguments.
+
 ##### Simple example
 
 ```javascript
@@ -40,13 +42,13 @@ In "Task 2" function, the results and errors which we got from previous task are
 
 [API Documentation](munawwar.github.io/flow/doc/)
 
-##### More complex example (with repeating tasks and inc() call).
+##### More complex example (with repeating tasks).
 
 ```javascript
 flow(function (counter) {
+    counter.set(2);
     //Do some async operations
     for (var i = 2; i > 0; i -= 1) {
-        counter.inc(); //increments counter by 1
         setTimeout(function () {
             counter.tick(null, this.index);
         }.bind({index: i}), Math.random() * 100);
@@ -58,12 +60,11 @@ flow(function (counter) {
     console.log('Task 2 completed.');
     counter.next(); //needed to execute next task
 }, function (counter, errs, results, repeatCount) {
-    if (repeatCount < 2) {
-        counter.setFlow({repeat: true}); //which means when tick() reaches zero, it will repeat this task again.
-    }
+    var repeat = (repeatCount < 2);
+    counter.set(2, repeat); //if repeat = true, then this task will be repeated when counter hits zero.
+    
     //Do some async operations
     for (var i = 2; i > 0; i -= 1) {
-        counter.inc();
         setTimeout(function () {
             counter.tick(null, this.index);
         }.bind({index: i}), Math.random() * 100);
