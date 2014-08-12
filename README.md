@@ -40,7 +40,7 @@ In "Task 2" function, the results and errors which we got from previous task are
 
 ##### Documentation
 
-[API Documentation](munawwar.github.io/flow/doc/)
+[API Documentation](http://munawwar.github.io/flowjs/doc/)
 
 ##### More complex example (with repeating tasks).
 
