@@ -1,42 +1,63 @@
 <!DOCTYPE html>
 <html>
-  <head>
-      <script type="text/javascript" src="../flow.js"></script>
-  </head>
-  <body>
-      <script type="text/javascript">
-        window.onload = function () {
-            flow(function (errs, results, fl) {
-                //Do some async operations
-                for (var i = 2; i > 0; i -= 1) {
-                    fl.inc();
+    <head>
+        <script type="text/javascript" src="../flow.js"></script>
+    </head>
+    <body>
+        <script type="text/javascript">
+            window.onload = function () {
+                flow(function (fl) {
+                    //Doing some non-async stuff here, then call fl.next().
+                    fl.next(null, 'Task 1 result');
+                }, function (errs, results, fl) {
+                    console.log('Task 1 completed.');
+                    console.log(errs);
+                    console.log(results);
+
+                    //Do some async stuff
                     setTimeout(function () {
-                        fl.tick(null, this.index);
-                    }.bind({index: i}), Math.random() * 100);
-                }
-                console.log('Task 1 completed.');
-            }, function (errs, results, fl) {
-                console.log(errs);
-                console.log(results);
-                console.log('Task 2 completed.');
-                fl.next();
-            }, function (errs, results, fl) {
-                var repeat = (fl.repeatCount < 2);
-                fl.set(2, repeat); //if repeat = true, then when tick() reaches zero, it will repeat this task again.
-                //Do some async operations
-                for (var i = 2; i > 0; i -= 1) {
+                        fl.next(null, 'Task 2 result');
+                    }, 100);
+                }, function (errs, results, fl) {
+                    console.log('Task 2 completed.');
+                    console.log(errs);
+                    console.log(results);
+
+                    //Do two async stuff in parallel
+                    fl.set(2); //this sets internal counter to 2.
                     setTimeout(function () {
-                        fl.tick(null, this.index);
-                    }.bind({index: i}), Math.random() * 100);
-                }
-                console.log('Task 3 completed.');
-            }, function (errs, results) {
-                console.log(errs);
-                console.log(results);
-                console.log('Task 4 completed.');
-                console.log('Done');
-            })();
-        };
-      </script>
-  </body>
+                        //tick() queues error and result and also decrements internal count by 1.
+                        //When counter hits zero, the next task will be executed.
+                        fl.tick(null, 'Async 1 result');
+                    }, Math.random() * 100);
+
+                    setTimeout(function () {
+                        fl.tick(null, 'Async 2 result');
+                    }, Math.random() * 100);
+                }, function (errs, results, fl) {
+                    if (fl.repeatCount === 0) {
+                        console.log('Task 3 completed.');
+                        console.log(errs);
+                        console.log(results);
+                    } else {
+                        console.log('Task 4 repeated');
+                    }
+
+                    //Do some parallel async operations and repeat this task two times.
+                    var repeat = (fl.repeatCount < 2);
+                    fl.set(2, repeat); //if repeat = true, then when tick() reaches zero, it will repeat this task again.
+                    for (var i = 2; i > 0; i -= 1) {
+                        setTimeout(function () {
+                            fl.tick(null, this.index);
+                        }.bind({index: i}), Math.random() * 100);
+                    }
+                }, function (errs, results) {
+                    console.log('Task 4 completed.');
+                    console.log(errs);
+                    console.log(results);
+                    console.log('Done');
+                })();
+            };
+        </script>
+    </body>
 </html>

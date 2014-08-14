@@ -23,30 +23,6 @@
 (function (global) {
 <span id='flow'>    /**
 </span>     * Manage asyncronous operations.
-
-    flow(function (c) {
-        for (var i = 0; i &lt; 3; i += 1) {
-            c.inc();
-            ...
-            ...
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        c.dec(null, JSON.parse(xhr.resposeText));
-                    } else {
-                        c.dec({errorCode: xhr.status});
-                    }
-                }
-            }
-        }
-    }, function (c, err, results) {
-        //do something
-    }, this); //context in which the funtions will run
-
-    //Another way to use
-    var tasks = flow.tasks(...);
-    tasks.execute();
-
      * @class flow
      * @singleton
      * @param {Object} [config]
@@ -54,16 +30,6 @@
      * @param {Object} [scope]
      */
     function flow() {
-        flow.tasks.apply(this, arguments).next();
-    }
-
-<span id='flow-method-tasks'>    /**
-</span>     * Same arguments as flow(). The only difference is that the task isn't execute immediately.
-     * Use execute() method to start executing the list.
-     * @method tasks
-     * @returns {Manager}
-     */
-    flow.tasks = function () {
         var callbacks = Array.prototype.slice.call(arguments),
             options = {};
         if (typeof callbacks[0] === 'object') {
@@ -72,15 +38,26 @@
         if (typeof callbacks[callbacks.length - 1] === 'object') {
             options.scope = callbacks.pop();
         }
-        return new Manager(callbacks, options);
-    };
+
+        return function executeTasks(errorsParent, resultsParent, counter) {
+            var manager = new Manager(callbacks, options);
+            //pipe output from previous callback of parent as input to this task.
+            manager.execute(errorsParent, resultsParent, function (errors, results) {
+                //once all tasks completed, pipe output from last callback of this
+                //task as input to the next callback of parent.
+                if (counter) {
+                    counter.next(errors, results);
+                }
+            });
+        };
+    }
 
 <span id='Manager'>    /**
 </span>     * Manager class
      * @private
      */
     function Manager(callbacks, options) {
-        this.callbacks = callbacks;
+        this.callbacks = callbacks.slice(0);
         this.lastArgs = [];
         this.errors = [];
         this.results = [];
@@ -136,7 +113,6 @@
                 this.results.push(result);
             }
 
-            //TODO: Think about whether to send array when all values are null or not..
             var errs = compact(this.errors), res;
             //don't repeat if !this.tolerance &amp;&amp; error.
             if (this.repeatNext &amp;&amp; (this.tolerance || (!this.tolerance &amp;&amp; !errs))) {
@@ -161,11 +137,30 @@
                     errs = errs[0];
                 }
                 var counter = new Counter({manager: this, tolerance: this.tolerance});
-                this.callbacks[this.currentFunc].call(this.scope, counter, errs, res, this.repeatCount);
+                counter.repeatCount = this.repeatCount;
+
+                var args = [errs, res, counter];
+                if (this.currentFunc === 0) {
+                    if (errs === undefined || errs === null) {
+                        args.shift();
+                        if (result === undefined) {
+                            args.shift();
+                        }
+                    }
+                }
+                this.callbacks[this.currentFunc].apply(this.scope, args);
             }
+        },
+
+<span id='Manager-method-execute'>        /**
+</span>         * Start executing task. Similar signature as next(), but additionally takes
+         * a 3rd parameter as callback, that will be called once all the tasks complete.
+         */
+        execute: function (err, result, cb) {
+            this.callbacks.push(cb);
+            this.next(err, result);
         }
     };
-    Manager.prototype.execute = Manager.prototype.next;
 
 <span id='Counter'>    /**
 </span>     * A counter, that callbacks have access to.
@@ -246,7 +241,6 @@
             }
         }
     };
-    Counter.prototype.execute = Counter.prototype.next;
 
     /*
      * If all items of array are empty, return null.
