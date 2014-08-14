@@ -36,8 +36,8 @@ flow(function (fl) { //Task 1
     fl.set(2); //this sets internal counter to 2.
 
     setTimeout(function () {
-        //tick(error, result) queues error and result and also decrements internal count by 1.
-        //When counter hits zero, the next task will be executed.
+        //tick(error, result) queues error and result and also decrements internal
+        //count by 1. When counter hits zero, the next task will be executed.
         fl.tick(null, 'Async 1 result');
     }, Math.random() * 100);
 
