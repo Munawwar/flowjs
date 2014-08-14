@@ -48,7 +48,22 @@ flow(function (fl) { //Task 1
     console.log('Task 3 completed.');
     console.log(errs);
     console.log(results);
+    console.log('Done.');
 })();
+```
+
+Output could potentially be:
+```
+Task 1 completed.
+null
+["Task 1 result"]
+Task 2 completed.
+null
+["Task 2 result"]
+Task 3 completed.
+null
+["Async 2 result", "Async 1 result"]
+Done.
 ```
 
 ##### How the example works:
