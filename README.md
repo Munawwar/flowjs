@@ -10,7 +10,7 @@ Why not use async library?
 Because it has too much API, and many of them, IMO, are redundant and not helping much in readability.
 The one that I do like is async.seq() and this library is like async.seq() with few more features.
 
-`flow(func1, func2, func3, ...[, scope])();` where each function gets `counter, err, results` as arguments.
+`flow(func1, func2, func3, ...[, scope])();` where each function gets ` errors, results, fl` as arguments.
 
 ##### Basic example
 
