@@ -6,30 +6,6 @@
 (function (global) {
     /**
      * Manage asyncronous operations.
-
-    flow(function (c) {
-        for (var i = 0; i < 3; i += 1) {
-            c.inc();
-            ...
-            ...
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        c.dec(null, JSON.parse(xhr.resposeText));
-                    } else {
-                        c.dec({errorCode: xhr.status});
-                    }
-                }
-            }
-        }
-    }, function (c, err, results) {
-        //do something
-    }, this); //context in which the funtions will run
-
-    //Another way to use
-    var tasks = flow.tasks(...);
-    tasks.execute();
-
      * @class flow
      * @singleton
      * @param {Object} [config]
@@ -120,7 +96,6 @@
                 this.results.push(result);
             }
 
-            //TODO: Think about whether to send array when all values are null or not..
             var errs = compact(this.errors), res;
             //don't repeat if !this.tolerance && error.
             if (this.repeatNext && (this.tolerance || (!this.tolerance && !errs))) {
@@ -146,7 +121,17 @@
                 }
                 var counter = new Counter({manager: this, tolerance: this.tolerance});
                 counter.repeatCount = this.repeatCount;
-                this.callbacks[this.currentFunc].call(this.scope, errs, res, counter);
+
+                var args = [errs, res, counter];
+                if (this.currentFunc === 0) {
+                    if (errs === undefined || errs === null) {
+                        args.shift();
+                        if (result === undefined) {
+                            args.shift();
+                        }
+                    }
+                }
+                this.callbacks[this.currentFunc].apply(this.scope, args);
             }
         },
 
