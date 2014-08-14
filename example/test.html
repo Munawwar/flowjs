@@ -6,38 +6,36 @@
   <body>
       <script type="text/javascript">
         window.onload = function () {
-            flow(function (counter) {
+            flow(function (errs, results, fl) {
                 //Do some async operations
                 for (var i = 2; i > 0; i -= 1) {
-                    counter.inc();
+                    fl.inc();
                     setTimeout(function () {
-                        counter.tick(null, this.index);
+                        fl.tick(null, this.index);
                     }.bind({index: i}), Math.random() * 100);
                 }
                 console.log('Task 1 completed.');
-            }, function (counter, errs, results) {
+            }, function (errs, results, fl) {
                 console.log(errs);
                 console.log(results);
                 console.log('Task 2 completed.');
-                counter.next();
-            }, function (counter, errs, results, repeatCount) {
-                if (repeatCount < 2) {
-                    counter.setFlow({repeat: true}); //which means when tick() reaches zero, it will repeat this task again.
-                }
+                fl.next();
+            }, function (errs, results, fl) {
+                var repeat = (fl.repeatCount < 2);
+                fl.set(2, repeat); //if repeat = true, then when tick() reaches zero, it will repeat this task again.
                 //Do some async operations
                 for (var i = 2; i > 0; i -= 1) {
-                    counter.inc();
                     setTimeout(function () {
-                        counter.tick(null, this.index);
+                        fl.tick(null, this.index);
                     }.bind({index: i}), Math.random() * 100);
                 }
                 console.log('Task 3 completed.');
-            }, function (counter, errs, results) {
+            }, function (errs, results) {
                 console.log(errs);
                 console.log(results);
                 console.log('Task 4 completed.');
                 console.log('Done');
-            })
+            });
         };
       </script>
   </body>

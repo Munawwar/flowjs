@@ -37,7 +37,7 @@
      * @param {Object} [scope]
      */
     function flow() {
-        flow.tasks.apply(this, arguments).next();
+        flow.tasks.apply(this, arguments)();
     }
 
     /**
@@ -55,7 +55,18 @@
         if (typeof callbacks[callbacks.length - 1] === 'object') {
             options.scope = callbacks.pop();
         }
-        return new Manager(callbacks, options);
+
+        var manager = new Manager(callbacks, options);
+        return function executeTasks(errorsParent, resultsParent, counter) {
+            //pipe output from previous callback of parent as input to this task.
+            manager.execute(errorsParent, resultsParent, function (errors, results) {
+                //once all tasks completed, pipe output from last callback of this
+                //task as input to the next callback of parent.
+                if (counter) {
+                    counter.next(errors, results);
+                }
+            });
+        };
     };
 
     /**
@@ -144,11 +155,20 @@
                     errs = errs[0];
                 }
                 var counter = new Counter({manager: this, tolerance: this.tolerance});
-                this.callbacks[this.currentFunc].call(this.scope, counter, errs, res, this.repeatCount);
+                counter.repeatCount = this.repeatCount;
+                this.callbacks[this.currentFunc].call(this.scope, errs, res, counter);
             }
+        },
+
+        /**
+         * Start executing task. Similar signature as next(), but additionally takes
+         * a 3rd parameter as callback, that will be called once all the tasks complete.
+         */
+        execute: function (err, result, cb) {
+            this.callbacks.push(cb);
+            this.next(err, result);
         }
     };
-    Manager.prototype.execute = Manager.prototype.next;
 
     /**
      * A counter, that callbacks have access to.
@@ -229,7 +249,6 @@
             }
         }
     };
-    Counter.prototype.execute = Counter.prototype.next;
 
     /*
      * If all items of array are empty, return null.
