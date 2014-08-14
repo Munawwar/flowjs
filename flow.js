@@ -37,16 +37,6 @@
      * @param {Object} [scope]
      */
     function flow() {
-        flow.tasks.apply(this, arguments)();
-    }
-
-    /**
-     * Same arguments as flow(). The only difference is that the task isn't execute immediately.
-     * Use execute() method to start executing the list.
-     * @method tasks
-     * @returns {Manager}
-     */
-    flow.tasks = function () {
         var callbacks = Array.prototype.slice.call(arguments),
             options = {};
         if (typeof callbacks[0] === 'object') {
@@ -56,8 +46,8 @@
             options.scope = callbacks.pop();
         }
 
-        var manager = new Manager(callbacks, options);
         return function executeTasks(errorsParent, resultsParent, counter) {
+            var manager = new Manager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
             manager.execute(errorsParent, resultsParent, function (errors, results) {
                 //once all tasks completed, pipe output from last callback of this
@@ -67,14 +57,14 @@
                 }
             });
         };
-    };
+    }
 
     /**
      * Manager class
      * @private
      */
     function Manager(callbacks, options) {
-        this.callbacks = callbacks;
+        this.callbacks = callbacks.slice(0);
         this.lastArgs = [];
         this.errors = [];
         this.results = [];
