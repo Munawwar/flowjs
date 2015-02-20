@@ -39,24 +39,30 @@
             options.scope = callbacks.pop();
         }
 
-        return function executeTasks(errorsParent, resultsParent, counter) {
-            var manager = new Manager(callbacks, options);
+        return function (parallelMgr, errorsParent, resultsParent) {
+            if (arguments.length === 2) {
+                resultsParent = errorsParent;
+                errorsParent = parallelMgr;
+                parallelMgr = null;
+            }
+
+            var manager = new SerialManager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
             manager.execute(errorsParent, resultsParent, function (errors, results) {
                 //once all tasks completed, pipe output from last callback of this
                 //task as input to the next callback of parent.
-                if (counter) {
-                    counter.next(errors, results);
+                if (parallelMgr) {
+                    parallelMgr.next(errors, results);
                 }
             });
         };
     }
 
-<span id='Manager'>    /**
-</span>     * Manager class
+<span id='SerialManager'>    /**
+</span>     * Manages serial async tasks.
      * @private
      */
-    function Manager(callbacks, options) {
+    function SerialManager(callbacks, options) {
         this.callbacks = callbacks.slice(0);
         this.lastArgs = [];
         this.errors = [];
@@ -66,7 +72,7 @@
 
         this.set(options);
     }
-    Manager.prototype = {
+    SerialManager.prototype = {
         callbacks: null,
 
         currentFunc: -1,
@@ -75,14 +81,14 @@
 
         results: null,
         errors: null,
-<span id='Manager-property-tolerance'>        /**
+<span id='SerialManager-property-tolerance'>        /**
 </span>         * Error tolerance level.
          */
         tolerance: 0, //call the next() method on an error.
         scope: null,
         lastArgs: null, //keeps track of arguments passed to last callback. This is needed in case of repeating a callback.
 
-<span id='Manager-method-set'>        /**
+<span id='SerialManager-method-set'>        /**
 </span>         * Decide the flow and behavior of task execution.
          * Tell what to do when counter hits zero or an error condition.
          * @param {Object} config
@@ -97,14 +103,19 @@
                 this.repeatNext = options.repeat;
             }
         },
-<span id='Manager-method-store'>        /**
+<span id='SerialManager-method-store'>        /**
 </span>         * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
          */
-        store: function (error, result) {
-            this.errors.push(error);
-            this.results.push(result);
+        store: function (error, result, index) {
+            if (typeof index === 'number') {
+                this.results[index] = result;
+                this.errors[index] = error;
+            } else {
+                this.results.push(result);
+                this.errors.push(error);
+            }
         },
-<span id='Manager-method-next'>        /**
+<span id='SerialManager-method-next'>        /**
 </span>         * Execute the next task.
          */
         next: function (error, result) {
@@ -133,26 +144,14 @@
 
             if (this.callbacks[this.currentFunc]) {
                 this.lastArgs = [errs, res];
-                if (!this.tolerance &amp;&amp; errs &amp;&amp; errs[0]) {
-                    errs = errs[0];
-                }
-                var counter = new Counter({manager: this, tolerance: this.tolerance});
-                counter.repeatCount = this.repeatCount;
+                var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
+                mgr.repeatCount = this.repeatCount;
 
-                var args = [errs, res, counter];
-                if (this.currentFunc === 0) {
-                    if (errs === undefined || errs === null) {
-                        args.shift();
-                        if (result === undefined) {
-                            args.shift();
-                        }
-                    }
-                }
-                this.callbacks[this.currentFunc].apply(this.scope, args);
+                this.callbacks[this.currentFunc].apply(this.scope, [mgr, errs, res]);
             }
         },
 
-<span id='Manager-method-execute'>        /**
+<span id='SerialManager-method-execute'>        /**
 </span>         * Start executing task. Similar signature as next(), but additionally takes
          * a 3rd parameter as callback, that will be called once all the tasks complete.
          */
@@ -162,49 +161,67 @@
         }
     };
 
-<span id='Counter'>    /**
-</span>     * A counter, that callbacks have access to.
-     * This has been moved from Manager, so that decrement operation on a stale counter doesn't affect the
-     * flow of control unknowingly. i.e just for robustness.
+<span id='ControlHelper'>    /**
+</span>     * Provides control functions to associated SerialManager as well as
+     * helps to manage parallel async calls within the serial task.
+     *
+     * Works internally with a simple idea of using counters to manage parallel calls.
      */
-    function Counter(config) {
+    function ControlHelper(config) {
+        //A ControlHelper instance can only be created within a serial task.
+        //Hence ControlHelper instnace is always associated with a SerialManager instance.
         this.manager = config.manager;
         this.tolerance = config.tolerance;
         this.count = 0;
     }
 
-    Counter.prototype = {
-<span id='Counter-method-set'>        /**
-</span>         * Set counter value. Also set the flow and behavior of task execution.
-         * @param {Number} val Value of the counter to be set.
-         * @param {Boolean} [repeat=false] Check setFlow() method for documentation.
-         * @param {Boolean} [tolerance] Check setFlow() method for documentation.
-         */
-        set: function (val, repeat, tolerance) {
-            if (typeof val === 'number' &amp;&amp; val &gt; 0) {
-                this.count = val;
-            }
-            this.setFlow({repeat: repeat, tolerance: tolerance});
-        },
-<span id='Counter-method-setFlow'>        /**
-</span>         * Decide the flow and behavior of task execution.
-         * Tell what to do when counter hits zero or when faced with an error.
-         * @param {Object} [config]
-         * @param {Boolean} [config.repeat=false] If true, repeats the current task exactly once, when counter hits zero.
-         * @param {Boolean} [config.tolerance=manager.tolerance] Error tolerance level.
+    ControlHelper.prototype = {
+<span id='ControlHelper-method-set'>        /**
+</span>         * Set counter value and also the behavior of task execution.
+         * &quot;Behavior&quot; means to tell flowjs what to do when counter hits zero or when faced with an error.
+         *
+         * @param {Number} count Value of the counter to be set.
+         * @param {Boolean} [repeat=false] If true, repeats the current task exactly once, when counter hits zero.
+         * @param {Boolean} [tolerance] Error tolerance level.
          * If an error is encountered when tolerance = 0, then a call to tick(err, null) will immediately cause the next task to be executed
          * and the error will be passed to that task.
          * If tolerance = 1, then tick(err, null) will store the error(s) and pass them to the next task only when counter hits zero.
          */
-        setFlow: function (config) {
+        set: function (count, repeat, tolerance) {
+            var config = count;
+            if (typeof count === 'number') {
+                config = {
+                    count: count,
+                    repeat: repeat,
+                    tolerance: tolerance
+                };
+            }
+            if (typeof config.count === 'number' &amp;&amp; config.count &gt; 0) {
+                this.count = config.count;
+            }
             if (config.tolerance !== undefined) {
                 this.tolerance = !!config.tolerance;
             }
+            delete config.tolerance; //Only affect local tolerance and not manager tolerance.
+
             this.manager.set(config);
         },
-<span id='Counter-method-inc'>        /**
-</span>         * Increment counter.
-         * @param {Number} [val=1]
+
+<span id='ControlHelper-method-set'>        /**
+</span>         * Set counter value and also the behavior of task execution.
+         * &quot;Behavior&quot; means to tell flowjs what to do when counter hits zero or when faced with an error.
+         *
+         * Polymorhic form of set(count, repeat, tolerance) method.
+         * @param {Object} config
+         * @param {Number} config.count Same as count param when it is a number.
+         * @param {Boolean} [config.repeat=false] Same as repeat param.
+         * @param {Boolean} [config.tolerance=manager.tolerance] Same as tolerance param.
+         * @method set
+         */
+
+<span id='ControlHelper-method-inc'>        /**
+</span>         * Increment counter. Use carefully within async callbacks to avoid race conditions.
+         * @param {Number} [val=1] Increment counter by val. Val should be a positive integer.
          */
         inc: function (val) {
             if (typeof val !== 'number' || val &lt;= 0) {
@@ -212,14 +229,22 @@
             }
             this.count += val;
         },
-<span id='Counter-method-tick'>        /**
+<span id='ControlHelper-method-tick'>        /**
 </span>         * Decrements counter by 1. Send the error or result.
+         * @param {Number} [index] The desired index in the results/errors array (of the next task) where the provided result/error should be placed.
+         * @param {Any|null} error
+         * @param {Any|null} result
+         * @private
          */
-        tick: function (error, result) {
+        tick: function (index, error, result) {
+            if (arguments.length &lt; 3) {
+                result = error;
+                error = index;
+            }
             //prevent invalid state...
             if (this.count &gt; 0) {
                 this.count -= 1;
-                this.manager.store(error, result);
+                this.manager.store(error, result, index);
                 if (!this.tolerance &amp;&amp; error) {
                     //set to zero so that future decrements, doesn't affect.
                     this.count = 0;
@@ -227,8 +252,8 @@
                 this.next();
             }
         },
-<span id='Counter-method-next'>        /**
-</span>         * Execute the next task.
+<span id='ControlHelper-method-next'>        /**
+</span>         * Execute the next task of the series.
          * Note: The next task won't be called if counter is greater than zero.
          */
         next: function (error, result) {
@@ -239,8 +264,43 @@
             if (this.count === 0) {
                 this.manager.next(error, result);
             }
+        },
+<span id='ControlHelper-method-parallel'>        /**
+</span>         * Utility function to help one to execute 'n' number of parallel tasks.
+         * @param {Number|Array|Object} n If number then this is the number of parallel tasks. If n is an array then func is called for each item of the array.
+         * If object then the config is mostly same as set() method and additionally config.array can be set instead of config.count.
+         * @param {Function} func(i or item, cb) The function to call 'n' number of times. func gets an index (or an item of array) and a callback as parameters.
+         * Make sure callback is called eventually and exactly once within func. Calling the callback a second time won't do anything (the passed values are discarded).
+         * @param {Object} [context] Context of 'this' keyword within func.
+         */
+        parallel: function (n, func, context) {
+            if (typeof n === 'object' &amp;&amp; !(n instanceof Array)) {
+                this.set(n);
+                n = n.array ? n.array : n.count;
+            }
+            if (typeof n === 'number') {
+                this.set(n);
+                for (var i = 0; i &lt; n; i += 1) {
+                    func.call(context, i, oneTimeUse(this.tick, this, i));
+                }
+            } else if (n instanceof Array) {
+                this.set(n.length);
+                for (var i = 0; i &lt; n.length; i += 1) {
+                    func.call(context, n[i], oneTimeUse(this.tick, this, i), i);
+                }
+            }
         }
     };
+
+    function oneTimeUse(func, scope, i) {
+        var called = false;
+        return function (errs, results) {
+            if (!called) {
+                called = true;
+                return func.call(scope, i, errs, results);
+            }
+        };
+    }
 
     /*
      * If all items of array are empty, return null.

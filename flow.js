@@ -147,8 +147,9 @@
     /**
      * Provides control functions to associated SerialManager as well as
      * helps to manage parallel async calls within the serial task.
+     *
+     * Works internally with a simple idea of using counters to manage parallel calls.
      */
-    /* Works internally with counters to manage parallel calls. */
     function ControlHelper(config) {
         //A ControlHelper instance can only be created within a serial task.
         //Hence ControlHelper instnace is always associated with a SerialManager instance.
