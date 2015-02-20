@@ -22,7 +22,13 @@
             options.scope = callbacks.pop();
         }
 
-        return function executeTasks(errorsParent, resultsParent, parallelMgr) {
+        return function (parallelMgr, errorsParent, resultsParent) {
+            if (arguments.length === 2) {
+                resultsParent = errorsParent;
+                errorsParent = parallelMgr;
+                parallelMgr = null;
+            }
+
             var manager = new SerialManager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
             manager.execute(errorsParent, resultsParent, function (errors, results) {
@@ -121,22 +127,10 @@
 
             if (this.callbacks[this.currentFunc]) {
                 this.lastArgs = [errs, res];
-                if (!this.tolerance && errs && errs[0]) {
-                    errs = errs[0];
-                }
                 var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
                 mgr.repeatCount = this.repeatCount;
 
-                var args = [errs, res, mgr];
-                if (this.currentFunc === 0) {
-                    if (errs === undefined || errs === null) {
-                        if (result === undefined) {
-                            args.shift();
-                            args.shift();
-                        }
-                    }
-                }
-                this.callbacks[this.currentFunc].apply(this.scope, args);
+                this.callbacks[this.currentFunc].apply(this.scope, [mgr, errs, res]);
             }
         },
 

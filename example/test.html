@@ -10,7 +10,7 @@
                     console.log('Executing Task 1.');
 
                     fl.next(null, 'Task 1 result'); //Call fl.next() to execute next task.
-                }, function (errs, results, fl) { //Task 2 - Managing two parallel async calls
+                }, function (fl, errs, results) { //Task 2 - Managing two parallel async calls
                     console.log('Task 1 completed.');
                     console.log(errs);
                     console.log(results);
@@ -23,7 +23,7 @@
                             callback(null, 'Async ' + (i + 1) + ' result');
                         }, Math.random() * 100);
                     }, this);
-                }, function (errs, results, fl) { //Task 3
+                }, function (fl, errs, results) { //Task 3
                     console.log('Task 2 completed.');
                     console.log(errs);
                     console.log(results);
