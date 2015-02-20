@@ -22,24 +22,24 @@
             options.scope = callbacks.pop();
         }
 
-        return function executeTasks(errorsParent, resultsParent, counter) {
-            var manager = new Manager(callbacks, options);
+        return function executeTasks(errorsParent, resultsParent, parallelMgr) {
+            var manager = new SerialManager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
             manager.execute(errorsParent, resultsParent, function (errors, results) {
                 //once all tasks completed, pipe output from last callback of this
                 //task as input to the next callback of parent.
-                if (counter) {
-                    counter.next(errors, results);
+                if (parallelMgr) {
+                    parallelMgr.next(errors, results);
                 }
             });
         };
     }
 
     /**
-     * Manager class
+     * Manages serial async tasks.
      * @private
      */
-    function Manager(callbacks, options) {
+    function SerialManager(callbacks, options) {
         this.callbacks = callbacks.slice(0);
         this.lastArgs = [];
         this.errors = [];
@@ -49,7 +49,7 @@
 
         this.set(options);
     }
-    Manager.prototype = {
+    SerialManager.prototype = {
         callbacks: null,
 
         currentFunc: -1,
@@ -83,9 +83,14 @@
         /**
          * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
          */
-        store: function (error, result) {
-            this.errors.push(error);
-            this.results.push(result);
+        store: function (error, result, index) {
+            if (typeof index === 'number') {
+                this.results[index] = result;
+                this.errors[index] = error;
+            } else {
+                this.results.push(result);
+                this.errors.push(error);
+            }
         },
         /**
          * Execute the next task.
@@ -119,14 +124,14 @@
                 if (!this.tolerance && errs && errs[0]) {
                     errs = errs[0];
                 }
-                var counter = new Counter({manager: this, tolerance: this.tolerance});
-                counter.repeatCount = this.repeatCount;
+                var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
+                mgr.repeatCount = this.repeatCount;
 
-                var args = [errs, res, counter];
+                var args = [errs, res, mgr];
                 if (this.currentFunc === 0) {
                     if (errs === undefined || errs === null) {
-                        args.shift();
                         if (result === undefined) {
+                            args.shift();
                             args.shift();
                         }
                     }
@@ -146,48 +151,65 @@
     };
 
     /**
-     * A counter, that callbacks have access to.
-     * This has been moved from Manager, so that decrement operation on a stale counter doesn't affect the
-     * flow of control unknowingly. i.e just for robustness.
+     * Provides control functions to associated SerialManager as well as
+     * helps to manage parallel async calls within the serial task.
      */
-    function Counter(config) {
+    /* Works internally with counters to manage parallel calls. */
+    function ControlHelper(config) {
+        //A ControlHelper instance can only be created within a serial task.
+        //Hence ControlHelper instnace is always associated with a SerialManager instance.
         this.manager = config.manager;
         this.tolerance = config.tolerance;
         this.count = 0;
     }
 
-    Counter.prototype = {
+    ControlHelper.prototype = {
         /**
-         * Set counter value. Also set the flow and behavior of task execution.
-         * @param {Number} val Value of the counter to be set.
-         * @param {Boolean} [repeat=false] Check setFlow() method for documentation.
-         * @param {Boolean} [tolerance] Check setFlow() method for documentation.
-         */
-        set: function (val, repeat, tolerance) {
-            if (typeof val === 'number' && val > 0) {
-                this.count = val;
-            }
-            this.setFlow({repeat: repeat, tolerance: tolerance});
-        },
-        /**
-         * Decide the flow and behavior of task execution.
-         * Tell what to do when counter hits zero or when faced with an error.
-         * @param {Object} [config]
-         * @param {Boolean} [config.repeat=false] If true, repeats the current task exactly once, when counter hits zero.
-         * @param {Boolean} [config.tolerance=manager.tolerance] Error tolerance level.
+         * Set counter value and also the behavior of task execution.
+         * "Behavior" means to tell flowjs what to do when counter hits zero or when faced with an error.
+         *
+         * @param {Number} count Value of the counter to be set.
+         * @param {Boolean} [repeat=false] If true, repeats the current task exactly once, when counter hits zero.
+         * @param {Boolean} [tolerance] Error tolerance level.
          * If an error is encountered when tolerance = 0, then a call to tick(err, null) will immediately cause the next task to be executed
          * and the error will be passed to that task.
          * If tolerance = 1, then tick(err, null) will store the error(s) and pass them to the next task only when counter hits zero.
          */
-        setFlow: function (config) {
+        set: function (count, repeat, tolerance) {
+            var config = count;
+            if (typeof count === 'number') {
+                config = {
+                    count: count,
+                    repeat: repeat,
+                    tolerance: tolerance
+                };
+            }
+            if (typeof config.count === 'number' && config.count > 0) {
+                this.count = config.count;
+            }
             if (config.tolerance !== undefined) {
                 this.tolerance = !!config.tolerance;
             }
+            delete config.tolerance; //Only affect local tolerance and not manager tolerance.
+
             this.manager.set(config);
         },
+
         /**
-         * Increment counter.
-         * @param {Number} [val=1]
+         * Set counter value and also the behavior of task execution.
+         * "Behavior" means to tell flowjs what to do when counter hits zero or when faced with an error.
+         *
+         * Polymorhic form of set(count, repeat, tolerance) method.
+         * @param {Object} config
+         * @param {Number} config.count Same as count param when it is a number.
+         * @param {Boolean} [config.repeat=false] Same as repeat param.
+         * @param {Boolean} [config.tolerance=manager.tolerance] Same as tolerance param.
+         * @method set
+         */
+
+        /**
+         * Increment counter. Use carefully within async callbacks to avoid race conditions.
+         * @param {Number} [val=1] Increment counter by val. Val should be a positive integer.
          */
         inc: function (val) {
             if (typeof val !== 'number' || val <= 0) {
@@ -197,12 +219,20 @@
         },
         /**
          * Decrements counter by 1. Send the error or result.
+         * @param {Number} [index] The desired index in the results/errors array (of the next task) where the provided result/error should be placed.
+         * @param {Any|null} error
+         * @param {Any|null} result
+         * @private
          */
-        tick: function (error, result) {
+        tick: function (index, error, result) {
+            if (arguments.length < 3) {
+                result = error;
+                error = index;
+            }
             //prevent invalid state...
             if (this.count > 0) {
                 this.count -= 1;
-                this.manager.store(error, result);
+                this.manager.store(error, result, index);
                 if (!this.tolerance && error) {
                     //set to zero so that future decrements, doesn't affect.
                     this.count = 0;
@@ -211,7 +241,7 @@
             }
         },
         /**
-         * Execute the next task.
+         * Execute the next task of the series.
          * Note: The next task won't be called if counter is greater than zero.
          */
         next: function (error, result) {
@@ -222,8 +252,34 @@
             if (this.count === 0) {
                 this.manager.next(error, result);
             }
+        },
+        /**
+         * Utility function to help one to execute 'n' number of parallel tasks.
+         * @param {Number|Object} n If number then this is the number of parallel tasks. If object then the config is same as set() method.
+         * @param {Function} func(cb, i) The function to call 'n' number of times. func gets a callback and an index as parameters.
+         * Make sure callback is called eventually and exactly once within func. Calling the callback a second time won't do anything (the passed values are discarded).
+         * @param {Object} [context] Context of 'this' keyword within func.
+         */
+        parallel: function (n, func, context) {
+            this.set(n);
+            if (typeof n === 'object') {
+                n = n.count;
+            }
+            for (var i = 0; i < n; i += 1) {
+                func.call(context, oneTimeUse(this.tick, this, i), i);
+            }
         }
     };
+
+    function oneTimeUse(func, scope, i) {
+        var called = false;
+        return function (errs, results) {
+            if (!called) {
+                called = true;
+                return func.call(scope, i, errs, results);
+            }
+        };
+    }
 
     /*
      * If all items of array are empty, return null.

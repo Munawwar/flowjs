@@ -6,57 +6,32 @@
     <body>
         <script type="text/javascript">
             window.onload = function () {
-                flow(function (fl) {
-                    //Doing some non-async stuff here, then call fl.next().
-                    fl.next(null, 'Task 1 result');
-                }, function (errs, results, fl) {
+                flow(function (fl) { //Task 1 - Simple example. No async stuff here
+                    console.log('Executing Task 1.');
+
+                    fl.next(null, 'Task 1 result'); //Call fl.next() to execute next task.
+                }, function (errs, results, fl) { //Task 2 - Managing two parallel async calls
                     console.log('Task 1 completed.');
                     console.log(errs);
                     console.log(results);
 
-                    //Do some async stuff
-                    setTimeout(function () {
-                        fl.next(null, 'Task 2 result');
-                    }, 100);
-                }, function (errs, results, fl) {
+                    //Do two async stuff in parallel.
+                    //The number 2 is for flowjs to know that once 2 callbacks are called, proceed to next task.
+                    fl.parallel(2, function (callback, i) {
+                        setTimeout(function () {
+                            //Once both setTimeouts complete and calls this callback, the next task is called.
+                            callback(null, 'Async ' + (i + 1) + ' result');
+                        }, Math.random() * 100);
+                    }, this);
+                }, function (errs, results, fl) { //Task 3
                     console.log('Task 2 completed.');
                     console.log(errs);
                     console.log(results);
+                    console.log('Done.');
 
-                    //Do two async stuff in parallel
-                    fl.set(2); //this sets internal counter to 2.
-                    setTimeout(function () {
-                        //tick() queues error and result and also decrements internal count by 1.
-                        //When counter hits zero, the next task will be executed.
-                        fl.tick(null, 'Async 1 result');
-                    }, Math.random() * 100);
-
-                    setTimeout(function () {
-                        fl.tick(null, 'Async 2 result');
-                    }, Math.random() * 100);
-                }, function (errs, results, fl) {
-                    if (fl.repeatCount === 0) {
-                        console.log('Task 3 completed.');
-                        console.log(errs);
-                        console.log(results);
-                    } else {
-                        console.log('Task 4 repeated');
-                    }
-
-                    //Do some parallel async operations and repeat this task two times.
-                    var repeat = (fl.repeatCount < 2);
-                    fl.set(2, repeat); //if repeat = true, then when tick() reaches zero, it will repeat this task again.
-                    for (var i = 2; i > 0; i -= 1) {
-                        setTimeout(function () {
-                            fl.tick(null, this.index);
-                        }.bind({index: i}), Math.random() * 100);
-                    }
-                }, function (errs, results) {
-                    console.log('Task 4 completed.');
-                    console.log(errs);
-                    console.log(results);
-                    console.log('Done');
-                })();
+                    //No more tasks so no need to call fl.next().
+                }
+                /*Any number of functions (tasks) can be added here.*/)();
             };
         </script>
     </body>
