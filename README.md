@@ -19,37 +19,33 @@ The one that I do like is async.seq() and this library is like async.seq() with 
 ```javascript
 flow(function (fl) { //Task 1 - Simple example. No async stuff here
     console.log('Executing Task 1.');
-    
+
     fl.next(null, 'Task 1 result'); //Call fl.next() to execute next task.
-}, function (errs, results, fl) { //Task 2 - Managing two parallel async calls
+}, function (fl, errs, results) { //Task 2 - Managing two parallel async calls
     console.log('Task 1 completed.');
     console.log(errs);
     console.log(results);
 
-    //Do two async stuff in parallel
-    fl.set(2); //this sets internal counter to 2.
-
-    setTimeout(function () {
-        //tick(error, result) queues error and result and also decrements internal count by 1.
-        //When counter hits zero, the next task will be executed automatically.
-        fl.tick(null, 'Async 1 result');
-    }, Math.random() * 100);
-
-    setTimeout(function () {
-        fl.tick(null, 'Async 2 result');
-    }, Math.random() * 100);
-}, function (errs, results, fl) { //Task 3
+    //Do two async stuff in parallel.
+    //The number 2 is for flowjs to know that once 2 callbacks are called, proceed to next task.
+    fl.parallel(2, function (callback, i) {
+        setTimeout(function () {
+            //Once both setTimeouts complete and calls this callback, the next task is called.
+            callback(null, 'Async ' + (i + 1) + ' result');
+        }, Math.random() * 100);
+    }, this);
+}, function (fl, errs, results) { //Task 3
     console.log('Task 2 completed.');
     console.log(errs);
     console.log(results);
     console.log('Done.');
-    
+
     //No more tasks so no need to call fl.next().
 }
 /*Any number of functions (tasks) can be added here.*/)();
 ```
 
-Output could potentially be:
+Output:
 ```
 Executing Task 1.
 Task 1 completed.
@@ -57,19 +53,18 @@ null
 ["Task 1 result"]
 Task 2 completed.
 null
-["Async 2 result", "Async 1 result"]
+["Async 1 result", "Async 2 result"]
 Done.
 ```
 
 ##### How the example works:
 
 Step 1:
-You are given a fl object that has an internal counter and should be used to set the number of async resources/callbacks that needs to be managed (which is two, in Task 2 above).
+You are given a fl object that has an internal counter and should be used to set the number of parallel async resources/callbacks that needs to be managed (which is two, in Task 2 above).
 
 Step 2:
-Use the same fl instance to decrement the internal counter (within the task) using the tick() method.
-Also pass the results/errors through tick() so that the next task in the list gets them as it's input.
-Once counter hits zero, flow.js automatically executes the next task in the list (which is "Task 2" in the example above).
+Pass the results/errors through callback once the async function returns so that the next task in the list gets them as it's input.
+This call also decrements the internal counter. And once the counter hits zero, flow.js automatically executes the next task in the list (which is "Task 3" in the example above).
 
 Step 3:
 In "Task 3", the results and errors which we got from the previous task is displayed.
@@ -84,15 +79,17 @@ In "Task 3", the results and errors which we got from the previous task is displ
 
 ```javascript
 flow(function (fl) {
-    //Do some parallel async operations and repeat this task two times.
     var repeat = (fl.repeatCount < 2);
-    fl.set(2, repeat); //if repeat = true, then when tick() reaches zero, it will repeat this task again.
-    for (var i = 2; i > 0; i -= 1) {
+    //Do some parallel async operations and repeat this task two times.
+    fl.parallel({
+        count: 2,
+        repeat: repeat
+    }, function (callback, i) {
         setTimeout(function () {
-            counter.tick(null, this.index);
-        }.bind({index: i}), Math.random() * 100);
-    }
-}, function (counter, errs, results) {
+            callback(null, 'Async ' + (i + 1) + ' result');
+        }, Math.random() * 100);
+    }, this);
+}, function (fl, errs, results) {
     console.log(errs);
     console.log(results);
     console.log('Done.');
@@ -110,7 +107,7 @@ flow(function (fl) {
     fl.next(null, 'Results to pass to taskList1');
 },
 taskList1,
-function (err, results) {
+function (fl, err, results) {
     console.log(results); //results from last callback of taskList1
 })();
 
