@@ -27,17 +27,26 @@ flow(function (fl) { //Task 1 - Simple example. No async stuff here
     console.log(results);
 
     //Do two async stuff in parallel.
-    //The number 2 is for flowjs to know that once 2 callbacks are called
-    //it needs to proceed to next task.
-    fl.parallel(2, function (callback, i) {
+    //The number 2 is for flowjs to know that once 2 callbacks are called, proceed to next task.
+    fl.parallel(2, function (i, callback) {
         setTimeout(function () {
+            //Once both setTimeouts complete and calls this callback, the next task is called.
             callback(null, 'Async ' + (i + 1) + ' result');
-            //Once both setTimeouts complete and calls the above callback,
-            //the next task is called.
         }, Math.random() * 100);
     }, this);
 }, function (fl, errs, results) { //Task 3
     console.log('Task 2 completed.');
+    console.log(errs);
+    console.log(results);
+
+    //Similar async operations as Task 2, but this time using an array as input.
+    fl.parallel(['Async 1', 'Async 2'], function (item, callback) {
+        setTimeout(function () {
+            callback(null, item + ' result');
+        }, Math.random() * 100);
+    }, this);
+}, function (fl, errs, results) { //Task 4
+    console.log('Task 3 completed.');
     console.log(errs);
     console.log(results);
     console.log('Done.');
@@ -54,6 +63,9 @@ Task 1 completed.
 null
 ["Task 1 result"]
 Task 2 completed.
+null
+["Async 1 result", "Async 2 result"]
+Task 3 completed.
 null
 ["Async 1 result", "Async 2 result"]
 Done.

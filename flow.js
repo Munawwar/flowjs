@@ -249,18 +249,27 @@
         },
         /**
          * Utility function to help one to execute 'n' number of parallel tasks.
-         * @param {Number|Object} n If number then this is the number of parallel tasks. If object then the config is same as set() method.
-         * @param {Function} func(cb, i) The function to call 'n' number of times. func gets a callback and an index as parameters.
+         * @param {Number|Array|Object} n If number then this is the number of parallel tasks. If n is an array then func is called for each item of the array.
+         * If object then the config is mostly same as set() method and additionally config.array can be set instead of config.count.
+         * @param {Function} func(i or item, cb) The function to call 'n' number of times. func gets an index (or an item of array) and a callback as parameters.
          * Make sure callback is called eventually and exactly once within func. Calling the callback a second time won't do anything (the passed values are discarded).
          * @param {Object} [context] Context of 'this' keyword within func.
          */
         parallel: function (n, func, context) {
-            this.set(n);
-            if (typeof n === 'object') {
-                n = n.count;
+            if (typeof n === 'object' && !(n instanceof Array)) {
+                this.set(n);
+                n = n.array ? n.array : n.count;
             }
-            for (var i = 0; i < n; i += 1) {
-                func.call(context, oneTimeUse(this.tick, this, i), i);
+            if (typeof n === 'number') {
+                this.set(n);
+                for (var i = 0; i < n; i += 1) {
+                    func.call(context, i, oneTimeUse(this.tick, this, i));
+                }
+            } else if (n instanceof Array) {
+                this.set(n.length);
+                for (var i = 0; i < n.length; i += 1) {
+                    func.call(context, n[i], oneTimeUse(this.tick, this, i), i);
+                }
             }
         }
     };
