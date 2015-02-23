@@ -83,6 +83,60 @@ This call also decrements the internal counter. And once the counter hits zero, 
 Step 3:
 In "Task 3", the results and errors which we got from the previous task is displayed.
 
+##### Cleaner example
+
+Now similar example with less comments and console.logs to show you how clean the code becomes. Let's take a typical flow of a client-side application's "bootstrapping" logic as an example.
+
+![Flowchart](flowchart.png)
+
+Now let's write the logic with flowjs.
+
+```
+window.CLIENTVERSION = 10;
+
+flow(function (fl, errs, results) {
+    //<Boostrapping code here>
+    //<Check unsupported browsers here>
+
+    //Fetch data version to check whether we need to migrate user or not.
+    ajax('GET', '/version', fl.next);
+}, function (fl, errs, results) {
+    if (!errs) {
+        var response = results[0];
+        if (response.dataVersion !== window.CLIENTVERSION) {
+            //Initiate data migration
+            ajax('GET', '/migrate', fl.next);
+        } else {
+            fl.next();
+        }
+    } else {
+        //Handle error
+    }
+}, function (fl, errs, results) {
+    if (!errs) {
+        ajax('GET', '/data', fl.next);
+    }
+}, function (fl, errs, results) {
+    if (!errs) {
+        //<Load application>
+        //Done.
+    }
+})();
+
+function ajax(method, url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.onload = function () {
+        if (this.status >= 200 && this.status < 300) {
+            callback(null, JSON.parse(this.resposeText));
+        } else {
+            callback(this.status);
+        }
+    };
+    xhr.send();
+}
+```
+
 ##### Documentation
 
 [API Documentation](http://munawwar.github.io/flowjs/doc/)
