@@ -22,36 +22,29 @@ flow(function (fl) { //Task 1 - Simple example. No async stuff here
 
     fl.next(null, 'Task 1 result'); //Call fl.next() to execute next task.
 }, function (fl, errs, results) { //Task 2 - Managing two parallel async calls
-    console.log('Task 1 completed.');
-    console.log(errs);
     console.log(results);
 
     //Do two async operations in parallel.
     fl.parallel(['Async 1', 'Async 2'], function (item, callback) {
-        //Once both setTimeouts complete and calls the
-        //callback, the next task is called.
+        //Once both setTimeouts complete and calls the callback, the next task is called.
         setTimeout(function () {
             callback(null, item + ' result');
         }, Math.random() * 100);
     }, this);
 }, function (fl, errs, results) { //Task 3
-    console.log('Task 2 completed.');
-    console.log(results);
+    console.log('Task 2 results: ' + results.join(', '));
 
     //Similar async operations as Task 2, but this time using counter.
     //The number 2 is for flowjs to know that once 2 callbacks
     //are called, proceed to next task.
     fl.parallel(2, function (i, callback) {
         setTimeout(function () {
-            
             callback(null, 'Async ' + (i + 1) + ' result');
         }, Math.random() * 100);
     }, this);
     
 }, function (fl, errs, results) { //Task 4
-    console.log('Task 3 completed.');
-    console.log(results);
-    console.log('Done.');
+    console.log('Task 3 results: ' + results.join(', '));
 
     //No more tasks so no need to call fl.next().
 }
@@ -61,14 +54,9 @@ flow(function (fl) { //Task 1 - Simple example. No async stuff here
 Output:
 ```
 Executing Task 1.
-Task 1 completed.
-null
 ["Task 1 result"]
-Task 2 completed.
-["Async 1 result", "Async 2 result"]
-Task 3 completed.
-["Async 1 result", "Async 2 result"]
-Done.
+Task 2 results: Async 1 result, Async 2 result
+Task 3 results: Async 1 result, Async 2 result
 ```
 
 ##### How the example works:
@@ -83,7 +71,7 @@ This call also decrements the internal counter. And once the counter hits zero, 
 Step 3:
 In "Task 3", the results and errors which we got from the previous task is displayed.
 
-##### Cleaner example
+### Clean example
 
 Now let's take a more real-world example to show you how clean the code becomes. Here is a flowchart containing some async operations a typical client-side application would need as part of it's "bootstrapping" logic:
 
