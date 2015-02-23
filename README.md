@@ -77,7 +77,7 @@ Now let's take a more real-world example to show you how clean the code becomes.
 
 ![Flowchart](flowchart.png)
 
-You can easily put calback inside callbaks to write such code, but you'll end up get into a (callback nightmare)[http://callbackhell.com/] when writing large pieces of code without a library. Now let's write the logic with flowjs.
+You can easily put calback inside callbaks to write such code, but you'll end up get into a [callback nightmare](http://callbackhell.com/) when writing large pieces of code without a library. Now let's write the logic with flowjs.
 
 ```
 window.CLIENTVERSION = 10;
