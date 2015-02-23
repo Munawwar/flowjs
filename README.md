@@ -77,7 +77,9 @@ Now let's take a more real-world example to show you how clean the code becomes.
 
 ![Flowchart](flowchart.png)
 
-You can easily put calback inside callbaks to write such code, but you'll end up get into a [callback nightmare](http://callbackhell.com/) when writing large pieces of code without a library. Now let's write the logic with flowjs.
+You can easily put callbacks inside callbacks to write code for such a case, but when writing large pieces of code you'll end up with deep nested functions that will be hard to read later on. If you then try to move functions out into the parent scope using variables or named functions then the flow of execution of the code becomes harder to understand.
+
+So now let's write the logic with flowjs.
 
 ```
 window.CLIENTVERSION = 10;
