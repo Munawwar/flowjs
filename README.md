@@ -81,7 +81,7 @@ You can easily put callbacks inside callbacks to write code for such a case, but
 
 So now let's write the logic with flowjs.
 
-```
+```javascript
 window.CLIENTVERSION = 10;
 
 flow(function (fl, errs, results) {
