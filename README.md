@@ -85,11 +85,11 @@ In "Task 3", the results and errors which we got from the previous task is displ
 
 ##### Cleaner example
 
-Now similar example with less comments and console.logs to show you how clean the code becomes. Let's take a typical flow of a client-side application's "bootstrapping" logic as an example.
+Now let's take a more real-world example to show you how clean the code becomes. Here is a flowchart containing some async operations a typical client-side application would need as part of it's "bootstrapping" logic:
 
 ![Flowchart](flowchart.png)
 
-Now let's write the logic with flowjs.
+You can easily put calback inside callbaks to write such code, but you'll end up get into a (callback nightmare)[http://callbackhell.com/] when writing large pieces of code without a library. Now let's write the logic with flowjs.
 
 ```
 window.CLIENTVERSION = 10;
