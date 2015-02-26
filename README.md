@@ -11,13 +11,13 @@ Because it has too much API, and many of them, IMO, are redundant and not helpin
 The one that I do like is async.seq() and this library is like async.seq() with few more features.
 
 Why not use Promises?
-Promises are great, but NodeJS/iojs APIs aren't using them yet. Libraries like [BlueBird](https://github.com/petkaantonov/bluebird) helps you convert NodeJS callback APIs to Promises. So you might want to look into that. Ultimately flowjs is another way to deal with callback hell.
+Promises are great, but nodejs/iojs APIs aren't using them yet. Libraries like [BlueBird](https://github.com/petkaantonov/bluebird) helps you convert nodejs callback APIs to Promises. So you might want to look into that. Ultimately flowjs is another way to deal with callback hell.
 
-With that said, [ES7 async/await](http://jakearchibald.com/2014/es7-async-functions/) syntax makes code much more readable than any existing solutions. So this library will ultimately become obsolete when ES7 async/await becomes more available for us to use.
+With that said, [ES7 async/await](http://jakearchibald.com/2014/es7-async-functions/) syntax makes code much more readable than any existing solution. So this library will ultimately become obsolete when ES7 async/await becomes more available for us to use.
 
 ### Basic API
 
-`flow(func1, func2, func3, ...[, scope])();` where each function gets ` errors, results, fl` as arguments.
+`flow(func1, func2, func3, ...[, scope])();` where each function gets `fl, errors, results` as arguments.
 
 ##### Basic example
 
