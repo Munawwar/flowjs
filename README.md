@@ -69,11 +69,11 @@ Task 3 results: Async 1 result, Async 2 result
 Step 1:
 You are given a fl object that has API to continue to next task (fl.next()) or do some parallel async operations and then continue to next task.
 
-In Task 2 above fl.parallel is used, which gives a callback to be called once the async operation completes.
+In Task 2 above, fl.parallel is used, which gives a callback to be called once an async operation completes.
 The results/errors are passed through this callback so that the next task in the list gets them as it's input.
-Once all the async operations complete and all the callbacks are called, flow.js automatically executes the next task in the list (which is "Task 3" in the example above).
+Once all the async operations complete and all the callbacks are called, flow.js automatically executes the next task (which is "Task 3" in the example above). which get an array of results and an array of errors.
 
-Step 3:
+Step 2:
 In "Task 3", the results and errors which we got from the previous task is displayed.
 
 ### Clean example
