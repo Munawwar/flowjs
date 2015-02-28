@@ -67,11 +67,11 @@ Task 3 results: Async 1 result, Async 2 result
 ##### How the example works:
 
 Step 1:
-You are given a fl object that has an internal counter and should be used to set the number of parallel async resources/callbacks that needs to be managed (which is two, in Task 2 above).
+You are given a fl object that has API to continue to next task (fl.next()) or do some parallel async operations and then continue to next task.
 
-Step 2:
-Pass the results/errors through callback once the async function returns so that the next task in the list gets them as it's input.
-This call also decrements the internal counter. And once the counter hits zero, flow.js automatically executes the next task in the list (which is "Task 3" in the example above).
+In Task 2 above fl.parallel is used, which gives a callback to be called once the async operation completes.
+The results/errors are passed through this callback so that the next task in the list gets them as it's input.
+Once all the async operations complete and all the callbacks are called, flow.js automatically executes the next task in the list (which is "Task 3" in the example above).
 
 Step 3:
 In "Task 3", the results and errors which we got from the previous task is displayed.
