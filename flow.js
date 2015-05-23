@@ -303,7 +303,7 @@
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = flow;
     } else if (typeof define === "function" && define.amd) {
-        define('flow', [], function () {
+        define([], function () {
             return flow;
         });
     } else {
