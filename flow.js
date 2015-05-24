@@ -22,7 +22,7 @@
             options.scope = callbacks.pop();
         }
 
-        return function (parallelMgr, errorsParent, resultsParent) {
+        return function (parallelMgr, errorsParent, resultsParent, baggageParent) {
             if (arguments.length === 2) {
                 resultsParent = errorsParent;
                 errorsParent = parallelMgr;
@@ -31,11 +31,11 @@
 
             var manager = new SerialManager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
-            manager.execute(errorsParent, resultsParent, function (errors, results) {
+            manager.execute(errorsParent, resultsParent, baggageParent, function (errors, results, baggage) {
                 //once all tasks completed, pipe output from last callback of this
                 //task as input to the next callback of parent.
                 if (parallelMgr) {
-                    parallelMgr.next(errors, results);
+                    parallelMgr.next(errors, results, baggage);
                 }
             });
         };
@@ -101,7 +101,7 @@
         /**
          * Execute the next task.
          */
-        next: function (error, result) {
+        next: function (error, result, baggage) {
             if (error !== undefined || result !== undefined) {
                 this.errors.push(error);
                 this.results.push(result);
@@ -130,7 +130,7 @@
                 var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
                 mgr.repeatCount = this.repeatCount;
 
-                this.callbacks[this.currentFunc].apply(this.scope, [mgr, errs, res]);
+                this.callbacks[this.currentFunc].apply(this.scope, [mgr, errs, res, baggage]);
             }
         },
 
@@ -138,9 +138,9 @@
          * Start executing task. Similar signature as next(), but additionally takes
          * a 3rd parameter as callback, that will be called once all the tasks complete.
          */
-        execute: function (err, result, cb) {
+        execute: function (err, result, baggage, cb) {
             this.callbacks.push(cb);
-            this.next(err, result);
+            this.next(err, result, baggage);
         }
     };
 
@@ -156,6 +156,7 @@
         this.manager = config.manager;
         this.tolerance = config.tolerance;
         this.count = 0;
+        this.baggage = null;
     }
 
     ControlHelper.prototype = {
@@ -188,6 +189,14 @@
             delete config.tolerance; //Only affect local tolerance and not manager tolerance.
 
             this.manager.set(config);
+        },
+
+        /**
+         * Set "baggage". This will be passed as third parameter to the next task.
+         * Useful to avoid parent scoped variables.
+         */
+        setBaggage: function (b) {
+            this.baggage = b;
         },
 
         /**
@@ -245,7 +254,7 @@
                 this.count = 0;
             }
             if (this.count === 0) {
-                this.manager.next(error, result);
+                this.manager.next(error, result, this.baggage);
             }
         },
         /**
