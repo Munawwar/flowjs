@@ -193,7 +193,7 @@
 
         /**
          * Set "baggage". This will be passed as third parameter to the next task.
-         * Useful to avoid parent scoped variables.
+         * Useful for avoiding scoped variables for your tasks.
          */
         setBaggage: function (b) {
             this.baggage = b;
