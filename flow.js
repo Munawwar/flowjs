@@ -23,7 +23,8 @@
         }
 
         return function (parallelMgr, errorsParent, resultsParent, baggageParent) {
-            if (arguments.length === 2) {
+            if (!(parallelMgr instanceof ControlHelper)) {
+                baggageParent = resultsParent;
                 resultsParent = errorsParent;
                 errorsParent = parallelMgr;
                 parallelMgr = null;
@@ -35,7 +36,8 @@
                 //once all tasks completed, pipe output from last callback of this
                 //task as input to the next callback of parent.
                 if (parallelMgr) {
-                    parallelMgr.next(errors, results, baggage);
+                    parallelMgr.setBaggage(baggage);
+                    parallelMgr.next(errors, results);
                 }
             });
         };
@@ -136,7 +138,7 @@
 
         /**
          * Start executing task. Similar signature as next(), but additionally takes
-         * a 3rd parameter as callback, that will be called once all the tasks complete.
+         * a 4th parameter as callback, that will be called once all the tasks complete.
          */
         execute: function (err, result, baggage, cb) {
             this.callbacks.push(cb);
