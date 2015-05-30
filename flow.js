@@ -87,6 +87,9 @@
             if (typeof options.repeat === 'boolean') {
                 this.repeatNext = options.repeat;
             }
+            if (options.scope) {
+                this.scope = options.scope;
+            }
         },
         /**
          * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
