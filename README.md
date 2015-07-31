@@ -96,26 +96,22 @@ flow(function (fl, errs, results) {
     //Fetch data version to check whether we need to migrate user or not.
     ajax('GET', '/version', fl.next);
 }, function (fl, errs, results) {
-    if (!errs) {
-        var response = results[0];
-        if (response.dataVersion !== window.CLIENTVERSION) {
-            //Initiate data migration
-            ajax('GET', '/migrate', fl.next);
-        } else {
-            fl.next();
-        }
+    if (errs) { return; } //Handle error and return
+    
+    var response = results[0];
+    if (response.dataVersion !== window.CLIENTVERSION) {
+        //Initiate data migration
+        ajax('GET', '/migrate', fl.next);
     } else {
-        //Handle error
+        fl.next();
     }
 }, function (fl, errs, results) {
-    if (!errs) {
-        ajax('GET', '/data', fl.next);
-    }
+    if (errs) { return; }
+    ajax('GET', '/data', fl.next);
 }, function (fl, errs, results) {
-    if (!errs) {
-        //<Load application>
-        //Done.
-    }
+    if (errs) { return; }
+    //<Load application>
+    //Done.
 })();
 
 function ajax(method, url, callback) {
