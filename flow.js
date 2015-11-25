@@ -79,6 +79,7 @@
          * @param {Object} config
          * @param {Boolean} [config.repeat=false] If true, repeats the current task once, when counter hits zero.
          * @param {Boolean} [config.tolerance=0]
+         * @param {Object} [config.scope]
          */
         set: function (options) {
             if (options.tolerance !== undefined) {
