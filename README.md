@@ -17,41 +17,46 @@ With that said, [ES7 async/await](http://jakearchibald.com/2014/es7-async-functi
 
 ### Basic API
 
-`flow(func1, func2, func3, ...[, scope])();` where each function gets `fl, errors, results` as arguments.
+`flow(func1, func2, func3, ...[, scope])();` where each function gets `ctl, errors, results` as arguments.
+
+The functions are "tasks" that are meant to be executed one after another.
+
+Within a "task", async operations can be executed. And once the async operations complete, the next task should be called. You have access to a control object that you can use to call the next task when you are done.
 
 ##### Basic example
 
 ```javascript
-flow(function (fl) { //Task 1 - Simple example. No async stuff here
+flow(function (ctl) { //Task 1 - Simple example. No async stuff here
     console.log('Executing Task 1.');
-
-    fl.next(null, 'Task 1 result'); //Call fl.next() to execute next task.
-}, function (fl, errs, results) { //Task 2 - Managing two parallel async calls
+    
+    //ctl is a control object, that you can use to continue to next task or execute parallel operations.
+    ctl.next(null, 'Task 1 result'); //Call ctl.next() to execute next task.
+}, function (ctl, errs, results) { //Task 2 - Managing two parallel async calls
     console.log(results);
 
     //Do two async operations in parallel.
-    fl.parallel(['Async 1', 'Async 2'], function (item, callback) {
+    ctl.parallel(['Async 1', 'Async 2'], function (item, callback) {
         //Once both setTimeouts complete and calls the callback, the next task is called.
         setTimeout(function () {
             callback(null, item + ' result');
         }, Math.random() * 100);
     }, this);
-}, function (fl, errs, results) { //Task 3
+}, function (ctl, errs, results) { //Task 3
     console.log('Task 2 results: ' + results.join(', '));
 
     //Similar async operations as Task 2, but this time using counter.
     //The number 2 is for flowjs to know that once 2 callbacks
     //are called, proceed to next task.
-    fl.parallel(2, function (i, callback) {
+    ctl.parallel(2, function (i, callback) {
         setTimeout(function () {
             callback(null, 'Async ' + (i + 1) + ' result');
         }, Math.random() * 100);
     }, this);
     
-}, function (fl, errs, results) { //Task 4
+}, function (ctl, errs, results) { //Task 4
     console.log('Task 3 results: ' + results.join(', '));
 
-    //No more tasks so no need to call fl.next().
+    //No more tasks so no need to call ctl.next().
 }
 /*Any number of functions (tasks) can be added here.*/)();
 ```
@@ -67,9 +72,9 @@ Task 3 results: Async 1 result, Async 2 result
 ##### How the example works:
 
 Step 1:
-You are given a fl object that has API to continue to next task (fl.next()) or do some parallel async operations and then continue to next task.
+You are given a control object (`ctl`) that has API to continue to next task (ctl.next()) or do some parallel async operations and then continue to next task.
 
-In Task 2 above, fl.parallel is used, which gives a callback to be called once an async operation completes.
+In Task 2 above, ctl.parallel is used, which gives a callback to be called once an async operation completes.
 The results/errors are passed through this callback so that the next task in the list gets them as it's input.
 Once all the async operations complete and all the callbacks are called, flow.js automatically executes the next task (which is "Task 3" in the example above). which get an array of results and an array of errors.
 
@@ -89,26 +94,26 @@ So now let's write the logic with flowjs.
 ```javascript
 window.CLIENTVERSION = 10;
 
-flow(function (fl, errs, results) {
+flow(function (ctl, errs, results) {
     //<Boostrapping code here>
     //<Check unsupported browsers here>
 
     //Fetch data version to check whether we need to migrate user or not.
-    ajax('GET', '/version', fl.next);
-}, function (fl, errs, results) {
+    ajax('GET', '/version', ctl.next);
+}, function (ctl, errs, results) {
     if (errs) { return; } //Handle error and return
     
     var response = results[0];
     if (response.dataVersion !== window.CLIENTVERSION) {
         //Initiate data migration
-        ajax('GET', '/migrate', fl.next);
+        ajax('GET', '/migrate', ctl.next);
     } else {
-        fl.next();
+        ctl.next();
     }
-}, function (fl, errs, results) {
+}, function (ctl, errs, results) {
     if (errs) { return; }
-    ajax('GET', '/data', fl.next);
-}, function (fl, errs, results) {
+    ajax('GET', '/data', ctl.next);
+}, function (ctl, errs, results) {
     if (errs) { return; }
     //<Load application>
     //Done.
@@ -137,18 +142,18 @@ function ajax(method, url, callback) {
 ##### Repeating tasks.
 
 ```javascript
-flow(function (fl) {
-    var repeat = (fl.repeatCount < 2);
+flow(function (ctl) {
+    var repeat = (ctl.repeatCount < 2);
     //Do some parallel async operations and repeat this task two times.
-    fl.parallel({
+    ctl.parallel({
         count: 2,
         repeat: repeat
-    }, function (callback, i) {
+    }, function (i, callback) {
         setTimeout(function () {
             callback(null, 'Async ' + (i + 1) + ' result');
         }, Math.random() * 100);
     }, this);
-}, function (fl, errs, results) {
+}, function (ctl, errs, results) {
     console.log(errs);
     console.log(results);
     console.log('Done.');
@@ -162,11 +167,11 @@ I've come across a circumstance where I needed to split a task list into two so 
 ```javascript
 var taskList1 = flow(...);
 
-flow(function (fl) {
-    fl.next(null, 'Results to pass to taskList1');
+flow(function (ctl) {
+    ctl.next(null, 'Results to pass to taskList1');
 },
 taskList1,
-function (fl, err, results) {
+function (ctl, err, results) {
     console.log(results); //results from last callback of taskList1
 })();
 
