@@ -21,7 +21,7 @@ With that said, [ES7 async/await](http://jakearchibald.com/2014/es7-async-functi
 
 The functions are "tasks" that are meant to be executed one after another.
 
-Within a "task", async operations can be executed. And once the async operations complete, the next task should be called. You have access to a control object that you can use to call the next task when you are done.
+Within a "task", async operations can be executed. And once the async operations complete, the next task should be called. You have access to a control object (`ctl`) that you can use to call the next task when you are done.
 
 ##### Basic example
 
