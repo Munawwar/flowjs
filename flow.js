@@ -163,6 +163,9 @@
         this.tolerance = config.tolerance;
         this.count = 0;
         this.baggage = null;
+        
+        //bind next, so that it can be passed directly to node.js APIs like fs.readFile.
+        this.next = this.next.bind(this);
     }
 
     ControlHelper.prototype = {
