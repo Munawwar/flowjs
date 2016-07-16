@@ -22,22 +22,22 @@
             options.scope = callbacks.pop();
         }
 
-        return function (parallelMgr, errorsParent, resultsParent, baggageParent) {
+        return function (parallelMgr, errorParent, resultParent, baggageParent) {
             if (!(parallelMgr instanceof ControlHelper)) {
-                baggageParent = resultsParent;
-                resultsParent = errorsParent;
-                errorsParent = parallelMgr;
+                baggageParent = resultParent;
+                resultParent = errorParent;
+                errorParent = parallelMgr;
                 parallelMgr = null;
             }
 
             var manager = new SerialManager(callbacks, options);
             //pipe output from previous callback of parent as input to this task.
-            manager.execute(errorsParent, resultsParent, baggageParent, function (errors, results, baggage) {
+            manager.execute(errorParent, resultParent, baggageParent, function (error, result, baggage) {
                 //once all tasks completed, pipe output from last callback of this
                 //task as input to the next callback of parent.
                 if (parallelMgr) {
                     parallelMgr.setBaggage(baggage);
-                    parallelMgr.next(errors, results);
+                    parallelMgr.next(error, result);
                 }
             });
         };
@@ -50,8 +50,6 @@
     function SerialManager(callbacks, options) {
         this.callbacks = callbacks.slice(0);
         this.lastArgs = [];
-        this.errors = [];
-        this.results = [];
 
         this.currentFunc = -1;
 
@@ -64,8 +62,8 @@
         repeatNext: false,
         repeatCount: 0,
 
-        results: null,
-        errors: null,
+        result: null,
+        error: null,
         /**
          * Error tolerance level.
          */
@@ -96,12 +94,17 @@
          * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
          */
         store: function (error, result, index) {
+            if (this.result === undefined) {
+                this.result = [];
+                this.error = [];
+            }
+
             if (typeof index === 'number') {
-                this.results[index] = result;
-                this.errors[index] = error;
+                this.result[index] = result;
+                this.error[index] = error;
             } else {
-                this.results.push(result);
-                this.errors.push(error);
+                this.result.push(result);
+                this.error.push(error);
             }
         },
         /**
@@ -109,34 +112,34 @@
          */
         next: function (error, result, baggage) {
             if (error !== undefined || result !== undefined) {
-                this.errors.push(error);
-                this.results.push(result);
+                this.error = error;
+                this.result = result;
             }
 
-            var errs = compact(this.errors), res;
+            var err = this.error, res;
             //don't repeat if !this.tolerance && error.
-            if (this.repeatNext && (this.tolerance || (!this.tolerance && !errs))) {
-                errs = this.lastArgs[0];
+            if (this.repeatNext && (this.tolerance || (!this.tolerance && !isPresent(err)))) {
+                err = this.lastArgs[0];
                 res = this.lastArgs[1];
 
                 this.repeatCount += 1;
             } else {
                 this.currentFunc += 1;
-                res = this.results;
+                res = this.result;
 
                 //reset in preparation for the next call in queue
-                this.errors = [];
-                this.results = [];
+                this.error = null;
+                this.result = null;
                 this.repeatCount = 0;
             }
             this.repeatNext = false;
 
             if (this.callbacks[this.currentFunc]) {
-                this.lastArgs = [errs, res];
+                this.lastArgs = [err, res];
                 var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
                 mgr.repeatCount = this.repeatCount;
 
-                this.callbacks[this.currentFunc].apply(this.scope, [mgr, errs, res, baggage]);
+                this.callbacks[this.currentFunc].apply(this.scope, [mgr, err, res, baggage]);
             }
         },
 
@@ -163,7 +166,7 @@
         this.tolerance = config.tolerance;
         this.count = 0;
         this.baggage = null;
-        
+
         //bind next, so that it can be passed directly to node.js APIs like fs.readFile.
         this.next = this.next.bind(this);
     }
@@ -221,16 +224,6 @@
          */
 
         /**
-         * Increment counter. Use carefully within async callbacks to avoid race conditions.
-         * @param {Number} [val=1] Increment counter by val. Val should be a positive integer.
-         */
-        inc: function (val) {
-            if (typeof val !== 'number' || val <= 0) {
-                val = 1;
-            }
-            this.count += val;
-        },
-        /**
          * Decrements counter by 1. Send the error or result.
          * @param {Number} [index] The desired index in the results/errors array (of the next task) where the provided result/error should be placed.
          * @param {Any|null} error
@@ -246,7 +239,7 @@
             if (this.count > 0) {
                 this.count -= 1;
                 this.manager.store(error, result, index);
-                if (!this.tolerance && error) {
+                if (!this.tolerance && isPresent(error)) {
                     //set to zero so that future decrements, doesn't affect.
                     this.count = 0;
                 }
@@ -258,7 +251,7 @@
          * Note: The next task won't be called if counter is greater than zero.
          */
         next: function (error, result) {
-            if (!this.tolerance && error) {
+            if (!this.tolerance && isPresent(error)) {
                 //set to zero so that future decrements, doesn't affect.
                 this.count = 0;
             }
@@ -279,19 +272,24 @@
                 this.set(n);
                 n = n.array ? n.array : n.count;
             }
+            var i;
             if (typeof n === 'number') {
                 this.set(n);
-                for (var i = 0; i < n; i += 1) {
+                for (i = 0; i < n; i += 1) {
                     func.call(context, i, oneTimeUse(this.tick, this, i));
                 }
             } else if (n instanceof Array) {
                 this.set(n.length);
-                for (var i = 0; i < n.length; i += 1) {
+                for (i = 0; i < n.length; i += 1) {
                     func.call(context, n[i], oneTimeUse(this.tick, this, i), i);
                 }
             }
         }
     };
+
+    function isPresent(err) {
+        return (err !== null && err !== undefined);
+    }
 
     function oneTimeUse(func, scope, i) {
         var called = false;
@@ -301,21 +299,6 @@
                 return func.call(scope, i, errs, results);
             }
         };
-    }
-
-    /*
-     * If all items of array are empty, return null.
-     * Else return original unmodified array.
-     */
-    function compact(arr) {
-        var isEmpty = true;
-        arr.some(function (a) {
-            if (a !== null && a !== undefined) {
-                isEmpty = false;
-                return true;
-            }
-        });
-        return isEmpty ? null : arr;
     }
 
     if (typeof module !== 'undefined' && module.exports) {

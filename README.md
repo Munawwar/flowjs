@@ -28,11 +28,11 @@ Within a "task", async operations can be executed. And once the async operations
 ```javascript
 flow(function (ctl) { //Task 1 - Simple example. No async stuff here
     console.log('Executing Task 1.');
-    
+
     //ctl is a control object, that you can use to continue to next task or execute parallel operations.
     ctl.next(null, 'Task 1 result'); //Call ctl.next() to execute next task.
-}, function (ctl, errs, results) { //Task 2 - Managing two parallel async calls
-    console.log(results);
+}, function (ctl, err, result) { //Task 2 - Managing two parallel async calls
+    console.log(result);
 
     //Do two async operations in parallel.
     ctl.parallel(['Async 1', 'Async 2'], function (item, callback) {
@@ -52,7 +52,7 @@ flow(function (ctl) { //Task 1 - Simple example. No async stuff here
             callback(null, 'Async ' + (i + 1) + ' result');
         }, Math.random() * 100);
     }, this);
-    
+
 }, function (ctl, errs, results) { //Task 4
     console.log('Task 3 results: ' + results.join(', '));
 
@@ -64,7 +64,7 @@ flow(function (ctl) { //Task 1 - Simple example. No async stuff here
 Output:
 ```
 Executing Task 1.
-["Task 1 result"]
+"Task 1 result"
 Task 2 results: Async 1 result, Async 2 result
 Task 3 results: Async 1 result, Async 2 result
 ```
@@ -94,27 +94,27 @@ So now let's write the logic with flowjs.
 ```javascript
 window.CLIENTVERSION = 10;
 
-flow(function (ctl, errs, results) {
+flow(function (ctl) {
     //<Boostrapping code here>
     //<Check unsupported browsers here>
 
     //Fetch data version to check whether we need to migrate user or not.
     ajax('GET', '/version', ctl.next);
-}, function (ctl, errs, results) {
-    if (errs) { return; } //Handle error and return
-    
-    var response = results[0];
+}, function (ctl, err, result) {
+    if (err) { return; } //Handle error and return
+
+    var response = result;
     if (response.dataVersion !== window.CLIENTVERSION) {
         //Initiate data migration
         ajax('GET', '/migrate', ctl.next);
     } else {
         ctl.next();
     }
-}, function (ctl, errs, results) {
-    if (errs) { return; }
+}, function (ctl, err, result) {
+    if (err) { return; }
     ajax('GET', '/data', ctl.next);
-}, function (ctl, errs, results) {
-    if (errs) { return; }
+}, function (ctl, err, result) {
+    if (err) { return; }
     //<Load application>
     //Done.
 })();
