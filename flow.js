@@ -64,10 +64,6 @@
 
         result: null,
         error: null,
-        /**
-         * Error tolerance level.
-         */
-        tolerance: 0, //call the next() method on an error.
         scope: null,
         lastArgs: null, //keeps track of arguments passed to last callback. This is needed in case of repeating a callback.
 
@@ -76,13 +72,9 @@
          * Tell what to do when counter hits zero or an error condition.
          * @param {Object} config
          * @param {Boolean} [config.repeat=false] If true, repeats the current task once, when counter hits zero.
-         * @param {Boolean} [config.tolerance=0]
          * @param {Object} [config.scope]
          */
         set: function (options) {
-            if (options.tolerance !== undefined) {
-                this.tolerance = !!options.tolerance;
-            }
             if (typeof options.repeat === 'boolean') {
                 this.repeatNext = options.repeat;
             }
@@ -116,15 +108,15 @@
                 this.result = result;
             }
 
-            var err = this.error, res;
-            //don't repeat if !this.tolerance && error.
-            if (this.repeatNext && (this.tolerance || (!this.tolerance && !isPresent(err)))) {
+            var err, res;
+            if (this.repeatNext) {
                 err = this.lastArgs[0];
                 res = this.lastArgs[1];
 
                 this.repeatCount += 1;
             } else {
                 this.currentFunc += 1;
+                err = this.error;
                 res = this.result;
 
                 //reset in preparation for the next call in queue
@@ -136,7 +128,7 @@
 
             if (this.callbacks[this.currentFunc]) {
                 this.lastArgs = [err, res];
-                var mgr = new ControlHelper({manager: this, tolerance: this.tolerance});
+                var mgr = new ControlHelper({manager: this});
                 mgr.repeatCount = this.repeatCount;
 
                 this.callbacks[this.currentFunc].apply(this.scope, [mgr, err, res, baggage]);
@@ -163,7 +155,6 @@
         //A ControlHelper instance can only be created within a serial task.
         //Hence ControlHelper instnace is always associated with a SerialManager instance.
         this.manager = config.manager;
-        this.tolerance = config.tolerance;
         this.count = 0;
         this.baggage = null;
 
@@ -178,27 +169,18 @@
          *
          * @param {Number} count Value of the counter to be set.
          * @param {Boolean} [repeat=false] If true, repeats the current task exactly once, when counter hits zero.
-         * @param {Boolean} [tolerance] Error tolerance level.
-         * If an error is encountered when tolerance = 0, then a call to tick(err, null) will immediately cause the next task to be executed
-         * and the error will be passed to that task.
-         * If tolerance = 1, then tick(err, null) will store the error(s) and pass them to the next task only when counter hits zero.
          */
-        set: function (count, repeat, tolerance) {
+        set: function (count, repeat) {
             var config = count;
             if (typeof count === 'number') {
                 config = {
                     count: count,
-                    repeat: repeat,
-                    tolerance: tolerance
+                    repeat: repeat
                 };
             }
             if (typeof config.count === 'number' && config.count > 0) {
                 this.count = config.count;
             }
-            if (config.tolerance !== undefined) {
-                this.tolerance = !!config.tolerance;
-            }
-            delete config.tolerance; //Only affect local tolerance and not manager tolerance.
 
             this.manager.set(config);
         },
@@ -215,11 +197,10 @@
          * Set counter value and also the behavior of task execution.
          * "Behavior" means to tell flowjs what to do when counter hits zero or when faced with an error.
          *
-         * Polymorhic form of set(count, repeat, tolerance) method.
+         * Polymorhic form of set(count, repeat) method.
          * @param {Object} config
          * @param {Number} config.count Same as count param when it is a number.
          * @param {Boolean} [config.repeat=false] Same as repeat param.
-         * @param {Boolean} [config.tolerance=manager.tolerance] Same as tolerance param.
          * @method set
          */
 
@@ -239,10 +220,6 @@
             if (this.count > 0) {
                 this.count -= 1;
                 this.manager.store(error, result, index);
-                if (!this.tolerance && isPresent(error)) {
-                    //set to zero so that future decrements, doesn't affect.
-                    this.count = 0;
-                }
                 this.next();
             }
         },
@@ -251,11 +228,8 @@
          * Note: The next task won't be called if counter is greater than zero.
          */
         next: function (error, result) {
-            if (!this.tolerance && isPresent(error)) {
-                //set to zero so that future decrements, doesn't affect.
-                this.count = 0;
-            }
             if (this.count === 0) {
+                this.count -= 1; //set to -1 so that future decrements, doesn't affect.
                 this.manager.next(error, result, this.baggage);
             }
         },
@@ -286,10 +260,6 @@
             }
         }
     };
-
-    function isPresent(err) {
-        return (err !== null && err !== undefined);
-    }
 
     function oneTimeUse(func, scope, i) {
         var called = false;
