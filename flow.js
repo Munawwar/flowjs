@@ -21,6 +21,10 @@
         if (typeof callbacks[callbacks.length - 1] === 'object') {
             options.scope = callbacks.pop();
         }
+        var last = callbacks[callbacks.length - 1];
+        if (typeof last === 'function' && last.name === 'catcher') {
+            options.catcher = callbacks.pop();
+        }
 
         return function (parallelMgr, errorParent, resultParent, baggageParent) {
             if (!(parallelMgr instanceof ControlHelper)) {
@@ -81,6 +85,9 @@
             if (options.scope) {
                 this.scope = options.scope;
             }
+            if (typeof options.catcher === 'function') {
+                this.catcher = options.catcher;
+            }
         },
         /**
          * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
@@ -131,7 +138,15 @@
                 var mgr = new ControlHelper({manager: this});
                 mgr.repeatCount = this.repeatCount;
 
-                this.callbacks[this.currentFunc].apply(this.scope, [mgr, err, res, baggage]);
+                if (!this.catcher) {
+                    this.callbacks[this.currentFunc].apply(this.scope, [mgr, err, res, baggage]);
+                } else {
+                    try {
+                        this.callbacks[this.currentFunc].apply(this.scope, [mgr, err, res, baggage]);
+                    } catch (e) {
+                        this.catcher.call(this.scope, e);
+                    }
+                }
             }
         },
 
@@ -142,6 +157,22 @@
         execute: function (err, result, baggage, cb) {
             this.callbacks.push(cb);
             this.next(err, result, baggage);
+        },
+
+        /**
+         * Alias for next(null, result). API inspired from Promises.
+         * @param {Any} result
+         */
+        resolve: function (result) {
+            this.next(null, result);
+        },
+
+        /**
+         * Alias for next(err). API inspired from Promises.
+         * @param {Any} err
+         */
+        reject: function (err) {
+            this.next(err);
         }
     };
 
