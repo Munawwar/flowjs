@@ -11,6 +11,10 @@
      * @param {Object} [config]
      * @param {Function} functions func1, func2, ... funcN
      * @param {Object} [scope]
+     *
+     * @return {Function} Returns a function. Which can either, directly be added as a flow task..
+     * or can be called as func() or func(err, result, function callback (err2, result2) { ... }). Parameters
+     * are optional.
      */
     function flow() {
         var callbacks = Array.prototype.slice.call(arguments),
@@ -27,11 +31,15 @@
         }
 
         return function (parallelMgr, errorParent, resultParent, baggageParent) {
-            if (!(parallelMgr instanceof ControlHelper)) {
+            var userCallback;
+            if (!(parallelMgr instanceof ControlHelper)) { //then assume only 3 arguments
                 baggageParent = resultParent;
                 resultParent = errorParent;
                 errorParent = parallelMgr;
+
                 parallelMgr = null;
+                userCallback = (baggageParent instanceof Function ? baggageParent : null);
+                baggageParent = null;
             }
 
             var manager = new SerialManager(callbacks, options);
@@ -42,6 +50,8 @@
                 if (parallelMgr) {
                     parallelMgr.setBaggage(baggage);
                     parallelMgr.next(error, result);
+                } else if (userCallback) {
+                    userCallback(error, result, baggage);
                 }
             });
         };
