@@ -103,7 +103,7 @@
          * Stores error and result, that are meant to be sent as arguments to the next callback in the list.
          */
         store: function (error, result, index) {
-            if (this.result === undefined) {
+            if (this.result === null) {
                 this.result = [];
                 this.error = [];
             }
