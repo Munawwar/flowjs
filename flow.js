@@ -167,22 +167,6 @@
         execute: function (err, result, baggage, cb) {
             this.callbacks.push(cb);
             this.next(err, result, baggage);
-        },
-
-        /**
-         * Alias for next(null, result). API inspired from Promises.
-         * @param {Any} result
-         */
-        resolve: function (result) {
-            this.next(null, result);
-        },
-
-        /**
-         * Alias for next(err). API inspired from Promises.
-         * @param {Any} err
-         */
-        reject: function (err) {
-            this.next(err);
         }
     };
 
@@ -201,6 +185,8 @@
 
         //bind next, so that it can be passed directly to node.js APIs like fs.readFile.
         this.next = this.next.bind(this);
+        this.resolve = this.resolve.bind(this);
+        this.reject = this.reject.bind(this);
     }
 
     ControlHelper.prototype = {
@@ -299,6 +285,22 @@
                     func.call(context, n[i], oneTimeUse(this.tick, this, i), i);
                 }
             }
+        },
+
+        /**
+         * Alias for next(null, result). API inspired from Promises.
+         * @param {Any} result
+         */
+        resolve: function (result) {
+            this.next(null, result);
+        },
+
+        /**
+         * Alias for next(err). API inspired from Promises.
+         * @param {Any} err
+         */
+        reject: function (err) {
+            this.next(err);
         }
     };
 
